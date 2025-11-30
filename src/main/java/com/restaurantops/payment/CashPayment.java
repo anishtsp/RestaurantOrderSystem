@@ -1,4 +1,18 @@
 package com.restaurantops.payment;
 
-public class CashPayment {
+import com.restaurantops.model.Bill;
+
+public class CashPayment implements PaymentStrategy {
+
+    @Override
+    public boolean pay(Bill bill) {
+        System.out.println("Processing CASH payment for Table "
+                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotal());
+        return true;
+    }
+
+    @Override
+    public String getName() {
+        return "CASH";
+    }
 }

@@ -1,4 +1,9 @@
 package com.restaurantops.model;
 
-public class OrderStatus {
+public enum OrderStatus {
+    NEW,
+    ACCEPTED,
+    REJECTED,
+    IN_PROGRESS,
+    COMPLETED
 }

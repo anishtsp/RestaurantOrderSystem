@@ -1,4 +1,8 @@
 package com.restaurantops.payment;
 
-public class PaymentStrategy {
+import com.restaurantops.model.Bill;
+
+public interface PaymentStrategy {
+    boolean pay(Bill bill);
+    String getName();
 }

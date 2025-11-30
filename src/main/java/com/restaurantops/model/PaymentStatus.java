@@ -1,4 +1,7 @@
 package com.restaurantops.model;
 
-public class PaymentStatus {
+public enum PaymentStatus {
+    UNPAID,
+    PAID,
+    FAILED
 }
