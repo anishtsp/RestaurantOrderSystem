@@ -34,12 +34,13 @@ public class CustomerView {
             switch (input) {
                 case "1" -> browseMenu();
                 case "2" -> placeOrder();
-                case "3" -> running = false;
+                case "3" -> {
+                    running = false;
+                    System.out.println("Exiting Customer View...");
+                }
                 default -> System.out.println("Invalid option.");
             }
         }
-
-        System.out.println("Exiting Customer View...");
     }
 
     private void browseMenu() {

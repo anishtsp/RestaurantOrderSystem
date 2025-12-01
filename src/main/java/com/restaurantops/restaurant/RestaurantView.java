@@ -34,7 +34,7 @@ public class RestaurantView {
             System.out.println("2. View Inventory");
             System.out.println("3. View Bills");
             System.out.println("4. Process Payment");
-            System.out.println("5. Exit Restaurant View (and stop backend)");
+            System.out.println("5. Exit Restaurant View (return to launcher)");
             System.out.print("Choice: ");
             String input = scanner.nextLine();
 
@@ -43,12 +43,13 @@ public class RestaurantView {
                 case "2" -> inventoryService.printInventory();
                 case "3" -> billingService.printAllBills();
                 case "4" -> processPayment();
-                case "5" -> running = false;
+                case "5" -> {
+                    running = false;
+                    System.out.println("Exiting Restaurant View...");
+                }
                 default -> System.out.println("Invalid option.");
             }
         }
-
-        System.out.println("Exiting Restaurant View...");
     }
 
     private void showOrders() {
