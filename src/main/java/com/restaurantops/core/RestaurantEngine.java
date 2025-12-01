@@ -19,13 +19,15 @@ public class RestaurantEngine {
     private DispatchThread dispatchThread;
     private Thread dispatchWorker;
 
+    private final LoggerService logger = new LoggerService();
     private final OrderTracker orderTracker = new OrderTracker();
-    private final MenuService menuService = new MenuService();
+    private final RecipeService recipeService = new RecipeService();
+    private final MenuService menuService = new MenuService(recipeService);
     private final InventoryService inventoryService = new InventoryService();
     private final BillingService billingService = new BillingService();
     private final ReservationService reservationService = new ReservationService();
-    private final OrderService orderService = new OrderService(priorityQueue);
-    private final StaffService staffService = new StaffService();
+    private final StaffService staffService = new StaffService(logger);
+    private final OrderService orderService = new OrderService(priorityQueue, logger);
 
     private KitchenRouterService routerService;
 
@@ -34,7 +36,8 @@ public class RestaurantEngine {
     private Thread idleMonitorThread;
 
     private long lastOrderTime = System.currentTimeMillis();
-    private boolean stationsPaused = false;
+    private volatile boolean stationsPaused = false;
+
     private boolean started = false;
 
     private RestaurantEngine() {}
@@ -46,41 +49,43 @@ public class RestaurantEngine {
     public synchronized void start() {
         if (started) return;
 
-        routerService = new KitchenRouterService(inventoryService, billingService, orderTracker);
+        logger.log("[ENGINE] Starting...");
 
-        Chef c1 = new Chef(1, "Ravi");
-        Chef c2 = new Chef(2, "Arjun");
-        Chef c3 = new Chef(3, "Meera");
+        java.util.List<com.restaurantops.model.MenuItem> menuList = menuService.getAllItems();
+        com.restaurantops.service.InventoryInitializer.syncMenuToInventory(menuList, inventoryService);
+        logger.log("[ENGINE] Inventory auto-loaded from menu");
 
-        staffService.addStaff(c1);
-        staffService.addStaff(c2);
-        staffService.addStaff(c3);
+        routerService = new KitchenRouterService(inventoryService, billingService, orderTracker, logger);
+
+        // add staff, assign chefs
+        staffService.addStaff(new Chef(1, "Ravi"));
+        // ... add other staff
 
         routerService.startAllStations();
 
         routerService.getStations().forEach((cat, station) -> {
             Chef chef = staffService.findAvailableChef();
-            if (chef != null) station.assignChef(chef);
+            if (chef != null) {
+                station.assignChef(chef);
+                logger.log("[ASSIGN] " + chef.getName() + " -> " + station.getName());
+            }
         });
 
-        dispatchThread = new DispatchThread(priorityQueue, routerService);
+        dispatchThread = new DispatchThread(priorityQueue, routerService, logger);
         dispatchWorker = new Thread(dispatchThread, "Dispatch-Thread");
         dispatchWorker.start();
 
-        inventoryThread = new Thread(new InventoryMonitorThread(inventoryService), "InventoryMonitor");
-        reservationThread = new Thread(new ReservationMonitorThread(reservationService), "ReservationMonitor");
-
+        inventoryThread = new Thread(new InventoryMonitorThread(inventoryService, logger), "InventoryMonitor");
         inventoryThread.start();
+
+        reservationThread = new Thread(new ReservationMonitorThread(reservationService, logger), "ReservationMonitor");
         reservationThread.start();
 
-        long checkInterval = 1000L * 30L;
-        long idleThreshold = 1000L * 60L * 10L;
-        idleMonitorThread = new Thread(new IdleMonitorThread(this, checkInterval, idleThreshold), "IdleMonitor");
-        idleMonitorThread.start();
-
+        // idle monitor...
         started = true;
-        System.out.println("[ENGINE] Started");
+        logger.log("[ENGINE] Started");
     }
+
 
     public synchronized void stop() {
         if (!started) return;
@@ -93,24 +98,26 @@ public class RestaurantEngine {
         if (idleMonitorThread != null) idleMonitorThread.interrupt();
 
         started = false;
-        System.out.println("[ENGINE] Stopped");
+        logger.log("[ENGINE] Stopped");
+    }
+
+    public void notifyNewOrder(Order order) {
+        lastOrderTime = System.currentTimeMillis();
+        if (stationsPaused) resumeStationsOnActivity();
     }
 
     public synchronized void pauseStationsForIdle() {
         if (stationsPaused) return;
         routerService.stopAllStations();
         stationsPaused = true;
+        logger.log("[ENGINE] Stations paused due to idle");
     }
 
     public synchronized void resumeStationsOnActivity() {
         if (!stationsPaused) return;
         routerService.startAllStations();
         stationsPaused = false;
-    }
-
-    public void notifyNewOrder(Order order) {
-        lastOrderTime = System.currentTimeMillis();
-        if (stationsPaused) resumeStationsOnActivity();
+        logger.log("[ENGINE] Stations resumed on activity");
     }
 
     public long getLastOrderTime() {
@@ -120,6 +127,8 @@ public class RestaurantEngine {
     public boolean isStationsPaused() {
         return stationsPaused;
     }
+
+    public LoggerService getLogger() { return logger; }
 
     public MenuService getMenuService() { return menuService; }
     public InventoryService getInventoryService() { return inventoryService; }

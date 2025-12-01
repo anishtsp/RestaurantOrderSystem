@@ -1,35 +1,37 @@
 package com.restaurantops.model;
 
 public class InventoryItem {
+
     private final String name;
     private int quantity;
+    private final long expiryTimestamp;
 
-    public InventoryItem(String name, int quantity) {
+    public InventoryItem(String name, int quantity, long expiryTimestamp) {
         this.name = name;
         this.quantity = quantity;
+        this.expiryTimestamp = expiryTimestamp;
     }
 
-    public String getName() { return name; }
-    public int getQuantity() { return quantity; }
-
-    public boolean hasAtLeast(int required) {
-        return quantity >= required;
+    public String getName() {
+        return name;
     }
 
-    public void deduct(int amount) {
-        if (amount <= 0) return;
-        if (amount > quantity) {
-            throw new IllegalArgumentException("Not enough stock for " + name);
-        }
-        quantity -= amount;
+    public int getQuantity() {
+        return quantity;
     }
 
-    public void add(int amount) {
-        if (amount > 0) quantity += amount;
+    public boolean isExpired() {
+        return System.currentTimeMillis() > expiryTimestamp;
+    }
+
+    public void reduce(int qty) {
+        quantity -= qty;
+        if (quantity < 0) quantity = 0;
     }
 
     @Override
     public String toString() {
-        return name + " = " + quantity + " units";
+        return name + " | qty=" + quantity +
+                " | expired=" + isExpired();
     }
 }

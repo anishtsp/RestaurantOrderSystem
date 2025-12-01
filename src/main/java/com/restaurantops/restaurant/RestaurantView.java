@@ -10,10 +10,11 @@ import com.restaurantops.payment.CardPayment;
 import com.restaurantops.payment.UpiPayment;
 import com.restaurantops.service.BillingService;
 import com.restaurantops.service.InventoryService;
+import com.restaurantops.service.KitchenRouterService;
+import com.restaurantops.service.LoggerService;
 import com.restaurantops.service.OrderService;
 import com.restaurantops.service.ReservationService;
 import com.restaurantops.service.StaffService;
-import com.restaurantops.service.KitchenRouterService;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -29,6 +30,7 @@ public class RestaurantView {
     private final ReservationService reservationService;
     private final StaffService staffService;
     private final KitchenRouterService routerService;
+    private final LoggerService loggerService;
     private final Scanner scanner = new Scanner(System.in);
 
     public RestaurantView(RestaurantEngine engine) {
@@ -39,6 +41,7 @@ public class RestaurantView {
         this.reservationService = engine.getReservationService();
         this.staffService = engine.getStaffService();
         this.routerService = engine.getRouterService();
+        this.loggerService = engine.getLogger();
     }
 
     public void run() {
@@ -53,7 +56,9 @@ public class RestaurantView {
             System.out.println("6. View Staff");
             System.out.println("7. View Kitchen Stations Status");
             System.out.println("8. Exit Restaurant View");
+            System.out.println("9. View System Logs");
             System.out.print("Choice: ");
+
             String choice = scanner.nextLine();
             switch (choice) {
                 case "1" -> showOrders();
@@ -64,6 +69,7 @@ public class RestaurantView {
                 case "6" -> showStaff();
                 case "7" -> showStations();
                 case "8" -> running = false;
+                case "9" -> showLogs();
                 default -> System.out.println("Invalid option.");
             }
         }
@@ -112,9 +118,11 @@ public class RestaurantView {
                     String name = stationObj instanceof KitchenStation
                             ? ((KitchenStation) stationObj).getName()
                             : stationObj.getClass().getSimpleName();
+
                     int q = -1;
                     boolean running = false;
                     String chefName = "None";
+
                     if (stationObj instanceof KitchenStation) {
                         KitchenStation ks = (KitchenStation) stationObj;
                         q = ks.queueSize();
@@ -125,13 +133,27 @@ public class RestaurantView {
                                 chefName = aks.getAssignedChef().getName();
                         }
                     }
-                    System.out.println("Station: " + name + " | Queue: " + q + " | Running: " + running + " | Chef: " + chefName);
+
+                    System.out.println("Station: " + name + " | Queue: " + q
+                            + " | Running: " + running + " | Chef: " + chefName);
                 }
             } else {
                 System.out.println("Stations unavailable.");
             }
         } catch (Exception ex) {
             System.out.println("Error displaying stations: " + ex.getMessage());
+        }
+    }
+
+    private void showLogs() {
+        System.out.println("\n=== System Logs ===");
+        List<String> logs = loggerService.getLogs();
+        if (logs.isEmpty()) {
+            System.out.println("No logs recorded.");
+            return;
+        }
+        for (String s : logs) {
+            System.out.println(s);
         }
     }
 

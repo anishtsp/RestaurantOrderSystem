@@ -3,54 +3,84 @@ package com.restaurantops.service;
 import com.restaurantops.model.InventoryItem;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
+import com.restaurantops.model.Recipe;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class InventoryService {
 
-    private final Map<String, InventoryItem> stock = new ConcurrentHashMap<>();
+    private final Map<String, InventoryItem> inventory = new HashMap<>();
 
-    public InventoryService() {
-        stock.put("Pasta",       new InventoryItem("Pasta", 20));
-        stock.put("Pizza",       new InventoryItem("Pizza", 15));
-        stock.put("Burger",      new InventoryItem("Burger", 25));
-        stock.put("Lemonade",    new InventoryItem("Lemonade", 30));
-        stock.put("Gulab Jamun", new InventoryItem("Gulab Jamun", 20));
+    public void addItem(String name, int qty, long expiryMillis) {
+        inventory.put(name.toLowerCase(),
+                new InventoryItem(name, qty, expiryMillis));
     }
 
     public boolean reserveIngredients(Order order) {
         MenuItem item = order.getItem();
-        InventoryItem inv = stock.get(item.getName());
-        if (inv == null) {
-            System.out.println("   [INVENTORY] No stock record for " + item.getName());
-            return false;
-        }
+        String key = item.getName().toLowerCase();
 
-        synchronized (inv) {
-            if (!inv.hasAtLeast(order.getQuantity())) {
-                System.out.println("   [INVENTORY] Out of stock for " + item.getName());
-                return false;
-            }
-            inv.deduct(order.getQuantity());
-        }
-        System.out.println("   [INVENTORY] Reserved " + order.getQuantity() + " x " +
-                item.getName() + " | Remaining: " + inv.getQuantity());
+        InventoryItem inv = inventory.get(key);
+        if (inv == null) return false;
+        if (inv.isExpired()) return false;
+        if (inv.getQuantity() < order.getQuantity()) return false;
+
+        inv.reduce(order.getQuantity());
         return true;
     }
 
-    public void restockLowItems() {
-        for (InventoryItem item : stock.values()) {
-            if (item.getQuantity() < 5) {
-                item.add(10);
-                System.out.println("   [INVENTORY] Restocked " + item.getName() +
-                        " to " + item.getQuantity());
+    // atomically reserve a recipe; returns true if reserved, false otherwise
+    public synchronized boolean reserveRecipe(Recipe recipe, int servings) {
+        Map<String, Integer> needed = new HashMap<>();
+        for (Map.Entry<String,Integer> e : recipe.getIngredients().entrySet()) {
+            String key = e.getKey().toLowerCase();
+            int totalNeeded = e.getValue() * servings;
+            InventoryItem inv = inventory.get(key);
+            if (inv == null || inv.isExpired() || inv.getQuantity() < totalNeeded) {
+                return false;
             }
+            needed.put(key, totalNeeded);
+        }
+        // commit reductions
+        for (Map.Entry<String,Integer> e : needed.entrySet()) {
+            inventory.get(e.getKey()).reduce(e.getValue());
+        }
+        return true;
+    }
+
+    // find low stock items under threshold
+    public synchronized Map<String, InventoryItem> getLowStock(int threshold) {
+        Map<String, InventoryItem> low = new HashMap<>();
+        for (Map.Entry<String, InventoryItem> e : inventory.entrySet()) {
+            if (e.getValue().getQuantity() <= threshold) low.put(e.getKey(), e.getValue());
+        }
+        return low;
+    }
+
+    // restock item (used by SupplierService)
+    public synchronized void restock(String name, int qty, long newExpiryMillis) {
+        String key = name.toLowerCase();
+        InventoryItem item = inventory.get(key);
+        if (item == null) inventory.put(key, new InventoryItem(name, qty, newExpiryMillis));
+        else {
+            item.reduce(-qty); // implement increase in InventoryItem or add method
+            // ensure expiry updated if later than current
         }
     }
 
+
     public void printInventory() {
-        System.out.println("\n=== Current Inventory ===");
-        stock.values().forEach(System.out::println);
+        for (InventoryItem i : inventory.values()) {
+            System.out.println(i);
+        }
+    }
+
+    public void refreshExpiries() {
+        inventory.values().removeIf(InventoryItem::isExpired);
+    }
+
+    public Map<String, InventoryItem> getInventory() {
+        return inventory;
     }
 }

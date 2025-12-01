@@ -10,10 +10,15 @@ import java.util.List;
 public class StaffService {
 
     private final List<Staff> staffList = Collections.synchronizedList(new ArrayList<>());
+    private final LoggerService logger;
+
+    public StaffService(LoggerService logger) {
+        this.logger = logger;
+    }
 
     public void addStaff(Staff s) {
         staffList.add(s);
-        System.out.println("[STAFF] Added: " + s.getName() + " (" + s.getRole() + ")");
+        logger.log("[STAFF] Added: " + s.getName() + " (" + s.getRole() + ")");
     }
 
     public List<Staff> getAllStaff() {
