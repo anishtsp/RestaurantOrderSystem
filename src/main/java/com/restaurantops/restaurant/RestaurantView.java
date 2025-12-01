@@ -8,6 +8,7 @@ import com.restaurantops.payment.UpiPayment;
 import com.restaurantops.service.BillingService;
 import com.restaurantops.service.InventoryService;
 import com.restaurantops.service.OrderService;
+import com.restaurantops.service.ReservationService;
 
 import java.util.List;
 import java.util.Scanner;
@@ -17,12 +18,14 @@ public class RestaurantView {
     private final OrderService orderService;
     private final InventoryService inventoryService;
     private final BillingService billingService;
+    private final ReservationService reservationService;
     private final Scanner scanner = new Scanner(System.in);
 
     public RestaurantView(RestaurantEngine engine) {
         this.orderService = engine.getOrderService();
         this.inventoryService = engine.getInventoryService();
         this.billingService = engine.getBillingService();
+        this.reservationService = engine.getReservationService();
     }
 
     public void run() {
@@ -34,7 +37,8 @@ public class RestaurantView {
             System.out.println("2. View Inventory");
             System.out.println("3. View Bills");
             System.out.println("4. Process Payment");
-            System.out.println("5. Exit Restaurant View (return to launcher)");
+            System.out.println("5. View Reservations");
+            System.out.println("6. Exit Restaurant View (return to launcher)");
             System.out.print("Choice: ");
             String input = scanner.nextLine();
 
@@ -43,7 +47,8 @@ public class RestaurantView {
                 case "2" -> inventoryService.printInventory();
                 case "3" -> billingService.printAllBills();
                 case "4" -> processPayment();
-                case "5" -> {
+                case "5" -> showReservations();
+                case "6" -> {
                     running = false;
                     System.out.println("Exiting Restaurant View...");
                 }
@@ -84,5 +89,10 @@ public class RestaurantView {
         } catch (NumberFormatException e) {
             System.out.println("Invalid number.");
         }
+    }
+
+    private void showReservations() {
+        System.out.println("\n=== Reservations ===");
+        reservationService.getAllReservations().forEach(System.out::println);
     }
 }

@@ -10,7 +10,7 @@ public class MainLauncher {
 
     public static void main(String[] args) {
 
-        // Start the backend engine (kitchen + inventory threads)
+        // Start the backend engine (kitchen + inventory + reservation threads)
         RestaurantEngine engine = RestaurantEngine.getInstance();
         engine.start();
 

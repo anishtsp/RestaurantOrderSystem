@@ -11,13 +11,15 @@ public class Order {
     private final MenuItem item;
     private final int quantity;
     private final LocalDateTime timestamp;
+    private final Customization customization;
     private OrderStatus status;
 
-    public Order(int tableNumber, MenuItem item, int quantity) {
+    public Order(int tableNumber, MenuItem item, int quantity, Customization customization) {
         this.orderId = ID_GEN.getAndIncrement();
         this.tableNumber = tableNumber;
         this.item = item;
-        this.quantity = quantity;
+        this.quantity = Math.max(1, quantity);
+        this.customization = customization;
         this.timestamp = LocalDateTime.now();
         this.status = OrderStatus.NEW;
     }
@@ -27,6 +29,7 @@ public class Order {
     public MenuItem getItem() { return item; }
     public int getQuantity() { return quantity; }
     public LocalDateTime getTimestamp() { return timestamp; }
+    public Customization getCustomization() { return customization; }
 
     public OrderStatus getStatus() { return status; }
     public void setStatus(OrderStatus status) { this.status = status; }
@@ -37,6 +40,7 @@ public class Order {
                 " | Table " + tableNumber +
                 " | " + item.getName() +
                 " x" + quantity +
+                (customization != null ? " " + customization : "") +
                 " | Status: " + status;
     }
 }
