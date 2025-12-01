@@ -13,6 +13,8 @@ public class Order {
     private final LocalDateTime timestamp;
     private final Customization customization;
     private OrderStatus status;
+    private OrderCategory category = OrderCategory.UNKNOWN;
+    private int priorityScore = 0;
 
     public Order(int tableNumber, MenuItem item, int quantity, Customization customization) {
         this.orderId = ID_GEN.getAndIncrement();
@@ -22,6 +24,11 @@ public class Order {
         this.customization = customization;
         this.timestamp = LocalDateTime.now();
         this.status = OrderStatus.NEW;
+    }
+
+    public Order(int tableNumber, MenuItem item, int quantity, Customization customization, OrderCategory category) {
+        this(tableNumber, item, quantity, customization);
+        this.category = category == null ? OrderCategory.UNKNOWN : category;
     }
 
     public int getOrderId() { return orderId; }
@@ -34,6 +41,12 @@ public class Order {
     public OrderStatus getStatus() { return status; }
     public void setStatus(OrderStatus status) { this.status = status; }
 
+    public OrderCategory getCategory() { return category; }
+    public void setCategory(OrderCategory category) { this.category = category; }
+
+    public int getPriorityScore() { return priorityScore; }
+    public void setPriorityScore(int priorityScore) { this.priorityScore = priorityScore; }
+
     @Override
     public String toString() {
         return "Order#" + orderId +
@@ -41,6 +54,7 @@ public class Order {
                 " | " + item.getName() +
                 " x" + quantity +
                 (customization != null ? " " + customization : "") +
+                " | Cat=" + category +
                 " | Status: " + status;
     }
 }

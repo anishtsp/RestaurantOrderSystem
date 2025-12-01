@@ -1,18 +1,19 @@
 package com.restaurantops.service;
 
+import com.restaurantops.core.RestaurantEngine;
 import com.restaurantops.model.Order;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 
 public class OrderService {
 
-    private final BlockingQueue<Order> orderQueue;
+    private final PriorityBlockingQueue<Order> orderQueue;
     private final List<Order> allOrders = Collections.synchronizedList(new ArrayList<>());
 
-    public OrderService(BlockingQueue<Order> orderQueue) {
+    public OrderService(PriorityBlockingQueue<Order> orderQueue) {
         this.orderQueue = orderQueue;
     }
 
@@ -21,8 +22,9 @@ public class OrderService {
             allOrders.add(order);
             orderQueue.put(order);
             System.out.println("[ORDER] Placed: " + order);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            RestaurantEngine.getInstance().notifyNewOrder(order);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
