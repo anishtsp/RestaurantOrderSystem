@@ -1,8 +1,10 @@
 package com.restaurantops.core;
 
 import com.restaurantops.model.Chef;
+import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
 import com.restaurantops.service.*;
+import com.restaurantops.thread.DeliveryWorkerThread;
 import com.restaurantops.thread.InventoryMonitorThread;
 import com.restaurantops.thread.ReservationMonitorThread;
 import com.restaurantops.tracking.OrderTracker;
@@ -13,55 +15,88 @@ public class RestaurantEngine {
 
     private static final RestaurantEngine INSTANCE = new RestaurantEngine();
 
-    private final PriorityBlockingQueue<Order> priorityQueue =
-            new PriorityBlockingQueue<>(11, new OrderPriorityComparator());
+    private final LoggerService logger;
+    private final OrderTracker orderTracker;
+    private final RecipeService recipeService;
+    private final MenuService menuService;
+    private final InventoryService inventoryService;
+    private final BillingService billingService;
+    private final ReservationService reservationService;
+    private final StaffService staffService;
+    private final OrderService orderService;
+    private final PriorityBlockingQueue<Order> priorityQueue;
+    private KitchenRouterService routerService;
 
     private DispatchThread dispatchThread;
     private Thread dispatchWorker;
 
-    private final LoggerService logger = new LoggerService();
-    private final OrderTracker orderTracker = new OrderTracker();
-    private final RecipeService recipeService = new RecipeService();
-    private final MenuService menuService = new MenuService(recipeService);
-    private final InventoryService inventoryService = new InventoryService();
-    private final BillingService billingService = new BillingService();
-    private final ReservationService reservationService = new ReservationService();
-    private final StaffService staffService = new StaffService(logger);
-    private final OrderService orderService = new OrderService(priorityQueue, logger);
-
-    private KitchenRouterService routerService;
+    private SupplierService supplierService;
+    private Thread deliveryThread;
 
     private Thread inventoryThread;
     private Thread reservationThread;
     private Thread idleMonitorThread;
 
-    private long lastOrderTime = System.currentTimeMillis();
+    private long lastOrderTime;
     private volatile boolean stationsPaused = false;
-
     private boolean started = false;
 
-    private RestaurantEngine() {}
+    private RestaurantEngine() {
+        logger = new LoggerService();
+        orderTracker = new OrderTracker();
+        recipeService = new RecipeService();
+
+        menuService = new MenuService(recipeService);
+        inventoryService = new InventoryService(recipeService, logger);
+
+        billingService = new BillingService();
+        reservationService = new ReservationService();
+        staffService = new StaffService(logger);
+
+        supplierService = new SupplierService(logger);
+
+        priorityQueue = new PriorityBlockingQueue<>(11, new OrderPriorityComparator());
+        orderService = new OrderService(priorityQueue, logger);
+
+        lastOrderTime = System.currentTimeMillis();
+    }
 
     public static RestaurantEngine getInstance() {
         return INSTANCE;
     }
+
 
     public synchronized void start() {
         if (started) return;
 
         logger.log("[ENGINE] Starting...");
 
-        java.util.List<com.restaurantops.model.MenuItem> menuList = menuService.getAllItems();
-        com.restaurantops.service.InventoryInitializer.syncMenuToInventory(menuList, inventoryService);
+        java.util.List<MenuItem> menuList = menuService.getAllItems();
+        InventoryInitializer.syncMenuToInventory(menuList, inventoryService);
         logger.log("[ENGINE] Inventory auto-loaded from menu");
 
-        routerService = new KitchenRouterService(inventoryService, billingService, orderTracker, logger);
+        inventoryService.setReorderThreshold("dough", 5);
+        inventoryService.setReorderThreshold("cheese", 5);
+        inventoryService.setReorderThreshold("tomato_sauce", 5);
+        inventoryService.setReorderThreshold("toppings", 5);
+        inventoryService.setReorderThreshold("bun", 5);
+        inventoryService.setReorderThreshold("patty", 5);
+        inventoryService.setReorderThreshold("lettuce", 5);
+        inventoryService.setReorderThreshold("lemon", 5);
+        inventoryService.setReorderThreshold("sugar", 5);
+        inventoryService.setReorderThreshold("water", 1);
 
-        // add staff, assign chefs
-        staffService.addStaff(new Chef(1, "Ravi"));
-        // ... add other staff
-
+        routerService = new KitchenRouterService(
+                inventoryService,
+                billingService,
+                orderTracker,
+                logger
+        );
         routerService.startAllStations();
+
+        staffService.addStaff(new Chef(1, "Ravi"));
+        staffService.addStaff(new Chef(2, "Arjun"));
+        staffService.addStaff(new Chef(3, "Meera"));
 
         routerService.getStations().forEach((cat, station) -> {
             Chef chef = staffService.findAvailableChef();
@@ -75,16 +110,45 @@ public class RestaurantEngine {
         dispatchWorker = new Thread(dispatchThread, "Dispatch-Thread");
         dispatchWorker.start();
 
-        inventoryThread = new Thread(new InventoryMonitorThread(inventoryService, logger), "InventoryMonitor");
+        inventoryThread = new Thread(
+                new InventoryMonitorThread(
+                        inventoryService,
+                        supplierService,
+                        logger
+                ),
+                "InventoryMonitor"
+        );
         inventoryThread.start();
 
-        reservationThread = new Thread(new ReservationMonitorThread(reservationService, logger), "ReservationMonitor");
+
+        deliveryThread = new Thread(
+                new DeliveryWorkerThread(supplierService, inventoryService, logger),
+                "DeliveryWorker"
+        );
+        deliveryThread.start();
+
+
+        reservationThread = new Thread(
+                new ReservationMonitorThread(reservationService, logger),
+                "ReservationMonitor"
+        );
         reservationThread.start();
 
-        // idle monitor...
+        idleMonitorThread = new Thread(
+                new IdleMonitorThread(
+                        this,
+                        5000,        // check every 5 seconds
+                        300000,      // idle threshold: 5 minutes
+                        logger
+                ),
+                "IdleMonitor"
+        );
+        idleMonitorThread.start();
+
         started = true;
         logger.log("[ENGINE] Started");
     }
+
 
 
     public synchronized void stop() {

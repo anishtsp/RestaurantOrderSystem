@@ -4,13 +4,12 @@ import com.restaurantops.core.RestaurantEngine;
 import com.restaurantops.model.Customization;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
+import com.restaurantops.model.OrderStatus;
 import com.restaurantops.service.MenuService;
 import com.restaurantops.service.OrderService;
 import com.restaurantops.service.ReservationService;
 import com.restaurantops.tracking.OrderListener;
 import com.restaurantops.tracking.OrderTracker;
-import com.restaurantops.service.ReservationService;
-
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,11 +23,22 @@ public class CustomerView {
     private final OrderTracker orderTracker;
     private final Scanner scanner = new Scanner(System.in);
 
+    // needed to filter updates for the current customer
+    private Integer lastOrderedTable = null;
+
     public CustomerView(RestaurantEngine engine) {
         this.menuService = engine.getMenuService();
         this.orderService = engine.getOrderService();
         this.reservationService = engine.getReservationService();
         this.orderTracker = engine.getOrderTracker();
+
+        // ⭐ Auto-subscribe for real-time status updates
+        this.orderTracker.addListener(new OrderListener() {
+            @Override
+            public void onOrderUpdated(Order order) {
+                handleOrderUpdate(order);
+            }
+        });
     }
 
     public void run() {
@@ -68,6 +78,9 @@ public class CustomerView {
         try {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
+
+            // keep this so the listener can filter updates
+            lastOrderedTable = table;
 
             browseMenu();
             System.out.print("Enter menu item id: ");
@@ -139,5 +152,32 @@ public class CustomerView {
         };
         orderTracker.addListener(l);
         System.out.println("Subscribed to order updates (temporary for this session).");
+    }
+
+    // ⭐ NEW — automatically shows REJECTED, IN_PROGRESS, ACCEPTED, COMPLETED
+    private void handleOrderUpdate(Order order) {
+        // filter updates — only show updates for the customer's own table
+        if (lastOrderedTable == null) return;
+        if (order.getTableNumber() != lastOrderedTable) return;
+
+        System.out.println(); // spacing
+
+        if (order.getStatus() == OrderStatus.REJECTED) {
+            System.out.println("❌ Your order #" + order.getOrderId() + " was REJECTED.");
+            System.out.println("Reason: item out of stock / expired.");
+            return;
+        }
+
+        if (order.getStatus() == OrderStatus.ACCEPTED) {
+            System.out.println("📦 Order #" + order.getOrderId() + " has been accepted by the kitchen.");
+        }
+
+        if (order.getStatus() == OrderStatus.IN_PROGRESS) {
+            System.out.println("⏳ Order #" + order.getOrderId() + " is now being prepared.");
+        }
+
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            System.out.println("✅ Order #" + order.getOrderId() + " is READY! Please collect.");
+        }
     }
 }

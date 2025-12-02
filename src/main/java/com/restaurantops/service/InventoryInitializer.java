@@ -9,31 +9,19 @@ import java.util.Random;
 
 public class InventoryInitializer {
 
-    private static final Random random = new Random();
+    public static void syncMenuToInventory(List<MenuItem> menuItems,
+                                           InventoryService inventoryService) {
 
-    // Overload #1 (List version)
-    public static void syncMenuToInventory(List<MenuItem> menu,
-                                           InventoryService inventory) {
+        for (MenuItem m : menuItems) {
+            if (m.getRecipe() == null) continue;
 
-        if (menu == null || inventory == null) return;
+            for (Map.Entry<String, Integer> e : m.getRecipe().getIngredients().entrySet()) {
+                String ingredient = e.getKey();
+                int qty = 20; // initial stock
+                long expiry = System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 2;
 
-        long expiry = System.currentTimeMillis() + (1000L * 60 * 60 * 24 * 3);
-
-        for (MenuItem item : menu) {
-            if (item == null) continue;
-            String key = item.getName().toLowerCase();
-            int qty = 10 + random.nextInt(31);
-            inventory.addItem(key, qty, expiry);
+                inventoryService.addItem(ingredient, qty, expiry);
+            }
         }
-    }
-
-    // Overload #2 (Map version)
-    public static void syncMenuToInventory(Map<Integer, MenuItem> menu,
-                                           InventoryService inventory) {
-
-        if (menu == null) return;
-
-        List<MenuItem> list = new ArrayList<>(menu.values());
-        syncMenuToInventory(list, inventory);
     }
 }

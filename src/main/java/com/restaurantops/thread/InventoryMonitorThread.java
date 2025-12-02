@@ -1,28 +1,43 @@
 package com.restaurantops.thread;
 
+import com.restaurantops.model.InventoryItem;
 import com.restaurantops.service.InventoryService;
 import com.restaurantops.service.LoggerService;
+import com.restaurantops.service.SupplierService;
+
+import java.util.Map;
 
 public class InventoryMonitorThread implements Runnable {
 
     private final InventoryService inventoryService;
+    private final SupplierService supplierService;
     private final LoggerService logger;
 
     public InventoryMonitorThread(InventoryService inventoryService,
+                                  SupplierService supplierService,
                                   LoggerService logger) {
         this.inventoryService = inventoryService;
+        this.supplierService = supplierService;
         this.logger = logger;
     }
 
     @Override
     public void run() {
-        try {
-            while (!Thread.interrupted()) {
-                Thread.sleep(30000);
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
                 inventoryService.refreshExpiries();
-                logger.log("[INVENTORY] Expiry check performed");
+
+                Map<String, InventoryItem> low = inventoryService.getLowStockItems();
+                if (!low.isEmpty()) {
+                    logger.log("[INVENTORY] Low stock detected: " + low.keySet());
+                    low.forEach((name, item) -> supplierService.placeOrder(name, 20));
+                }
+
+                Thread.sleep(3000);
+
+            } catch (InterruptedException e) {
+                return;
             }
-        } catch (InterruptedException ignored) {
         }
     }
 }
