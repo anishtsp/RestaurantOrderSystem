@@ -7,7 +7,7 @@ public class CashPayment implements PaymentStrategy {
     @Override
     public boolean pay(Bill bill) {
         System.out.println("Processing CASH payment for Table "
-                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotal());
+                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotalAmount());
         return true;
     }
 

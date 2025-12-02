@@ -90,6 +90,8 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
 
                 order.setStatus(OrderStatus.ACCEPTED);
                 orderTracker.notifyUpdate(order);
+                billingService.addOrderToBill(order);
+
 
                 boolean reserved = inventoryService.reserveIngredients(order);
                 if (!reserved) {
@@ -107,7 +109,7 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
                 order.setStatus(OrderStatus.COMPLETED);
                 orderTracker.notifyUpdate(order);
 
-                billingService.addItemToBill(order.getTableNumber(), order.getItem(), order.getQuantity());
+                billingService.addOrderToBill(order.getTableNumber(), order.getItem(), order.getQuantity());
 
                 logger.log("[" + getName() + "] Completed Order#" + order.getOrderId());
             }

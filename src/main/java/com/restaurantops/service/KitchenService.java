@@ -36,6 +36,7 @@ public class KitchenService {
             order.setStatus(OrderStatus.REJECTED);
             System.out.println("   [KITCHEN] Rejected (no stock): " + order);
             orderTracker.notifyUpdate(order);
+            billingService.addOrderToBill(order);
             return;
         }
 

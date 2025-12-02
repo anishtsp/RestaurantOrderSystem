@@ -11,7 +11,7 @@ public class CardPayment implements PaymentStrategy {
     @Override
     public boolean pay(Bill bill) {
         System.out.println("Processing CARD payment for Table "
-                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotal());
+                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotalAmount());
         return random.nextInt(10) != 0; // 10% fail chance
     }
 

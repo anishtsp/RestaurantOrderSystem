@@ -3,6 +3,7 @@ package com.restaurantops.restaurant;
 import com.restaurantops.core.RestaurantEngine;
 import com.restaurantops.kitchen.AbstractKitchenStation;
 import com.restaurantops.kitchen.KitchenStation;
+import com.restaurantops.model.Bill;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.Staff;
 import com.restaurantops.payment.CashPayment;
@@ -63,7 +64,7 @@ public class RestaurantView {
             switch (choice) {
                 case "1" -> showOrders();
                 case "2" -> inventoryService.printInventory();
-                case "3" -> billingService.printAllBills();
+                case "3" -> showBills();
                 case "4" -> processPayment();
                 case "5" -> showReservations();
                 case "6" -> showStaff();
@@ -157,24 +158,45 @@ public class RestaurantView {
         }
     }
 
+    private void showBills() {
+        System.out.println("\n=== ALL BILLS ===");
+        billingService.printAllBills();
+    }
+
     private void processPayment() {
         try {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
+
+            Bill bill = billingService.getOrCreateBill(table);
+            if (bill == null) {
+                System.out.println("No bill found.");
+                return;
+            }
+
+            if (bill.isPaid()) {
+                System.out.println("Bill already paid.");
+                return;
+            }
+
             System.out.println("Select payment method:");
             System.out.println("1. Cash");
             System.out.println("2. Card");
             System.out.println("3. UPI");
             System.out.print("Choice: ");
             String method = scanner.nextLine();
+
             switch (method) {
                 case "1" -> billingService.processPayment(table, new CashPayment());
                 case "2" -> billingService.processPayment(table, new CardPayment());
                 case "3" -> billingService.processPayment(table, new UpiPayment());
                 default -> System.out.println("Invalid payment option.");
             }
+
         } catch (Exception e) {
             System.out.println("Invalid input.");
         }
     }
+
+}
 }

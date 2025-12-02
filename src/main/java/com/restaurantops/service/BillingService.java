@@ -1,57 +1,70 @@
 package com.restaurantops.service;
 
 import com.restaurantops.model.Bill;
-import com.restaurantops.model.MenuItem;
-import com.restaurantops.model.PaymentStatus;
-import com.restaurantops.payment.PaymentStrategy;
+import com.restaurantops.model.Order;
+import com.restaurantops.payment.PaymentMethod;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class BillingService {
 
-    private final Map<Integer, Bill> bills = new ConcurrentHashMap<>();
+    private final Map<Integer, Bill> bills = new HashMap<>();
 
-    public void addItemToBill(int tableNumber, MenuItem item, int quantity) {
-        Bill bill = bills.computeIfAbsent(tableNumber, Bill::new);
-        bill.addItem(item, quantity);
-        System.out.println("   [BILLING] Added " + quantity + " x " + item.getName() +
-                " to Table " + tableNumber + " | Total now: ₹" + bill.getTotal());
+    public Bill getOrCreateBill(int tableNumber) {
+        Bill b = bills.get(tableNumber);
+        if (b == null) {
+            b = new Bill(tableNumber);
+            bills.put(tableNumber, b);
+        }
+        return b;
     }
 
-    public Bill getBillForTable(int tableNumber) {
-        return bills.get(tableNumber);
+    public void addOrderToBill(Order order) {
+        int table = order.getTableNumber();
+        Bill bill = getOrCreateBill(table);
+        bill.addOrder(order);
+    }
+
+    public void printBill(int tableNumber) {
+        Bill bill = bills.get(tableNumber);
+        if (bill == null) {
+            System.out.println("No bill exists for table " + tableNumber);
+            return;
+        }
+        System.out.println(bill);
     }
 
     public void printAllBills() {
-        System.out.println("\n=== Bills Summary ===");
         if (bills.isEmpty()) {
-            System.out.println("No bills generated.");
-        } else {
-            bills.values().forEach(System.out::println);
+            System.out.println("No bills available.");
+            return;
+        }
+        for (Bill b : bills.values()) {
+            System.out.println(b);
         }
     }
 
-    public void processPayment(int tableNumber, PaymentStrategy strategy) {
+    public void processPayment(int tableNumber, PaymentMethod method) {
         Bill bill = bills.get(tableNumber);
         if (bill == null) {
-            System.out.println("No bill found for table " + tableNumber);
-            return;
-        }
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            System.out.println("Table " + tableNumber + " already paid.");
+            System.out.println("No bill found for this table.");
             return;
         }
 
-        System.out.println("\n=== Payment for Table " + tableNumber +
-                " using " + strategy.getName() + " ===");
-        boolean success = strategy.pay(bill);
-        if (success) {
+        if (bill.isPaid()) {
+            System.out.println("Bill already paid.");
+            return;
+        }
+
+        boolean ok = method.process(bill.getTotalAmount());
+        if (ok) {
             bill.markPaid();
-            System.out.println("Payment SUCCESS for Table " + tableNumber);
+            System.out.println("Payment successful using: " + method.getMethodName());
+            System.out.println("--- Final Bill ---");
+            System.out.println(bill);
         } else {
-            bill.markFailed();
-            System.out.println("Payment FAILED for Table " + tableNumber);
+            System.out.println("Payment failed.");
         }
     }
 }
