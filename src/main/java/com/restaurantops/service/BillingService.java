@@ -24,15 +24,8 @@ public class BillingService {
         int table = order.getTableNumber();
         Bill bill = getOrCreateBill(table);
         bill.addOrder(order);
-    }
+        System.out.println("[DEBUG] Billing received order ID " + order.getOrderId());
 
-    public void printBill(int tableNumber) {
-        Bill bill = bills.get(tableNumber);
-        if (bill == null) {
-            System.out.println("No bill exists for table " + tableNumber);
-            return;
-        }
-        System.out.println(bill);
     }
 
     public void printAllBills() {

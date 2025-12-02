@@ -15,14 +15,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class AbstractKitchenStation implements KitchenStation, Runnable {
 
     protected final BlockingQueue<Order> queue = new LinkedBlockingQueue<>();
+
     protected final InventoryService inventoryService;
     protected final BillingService billingService;
     protected final OrderTracker orderTracker;
     protected final LoggerService logger;
 
-    private final StationContext context = new StationContext();
-    private Thread worker;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private Thread worker;
+
+    private final StationContext context = new StationContext();
 
     protected AbstractKitchenStation(InventoryService inventoryService,
                                      BillingService billingService,
@@ -34,11 +36,13 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
         this.logger = logger;
     }
 
+    @Override
     public void assignChef(Chef chef) {
         context.assignChef(chef);
         logger.log("[CHEF] " + chef.getName() + " assigned to " + getName());
     }
 
+    @Override
     public Chef getAssignedChef() {
         return context.getAssignedChef();
     }
@@ -47,8 +51,8 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
     public void acceptOrder(Order order) {
         try {
             queue.put(order);
-            Chef c = getAssignedChef();
-            String chefName = c == null ? "NoChef" : c.getName();
+            Chef chef = getAssignedChef();
+            String chefName = chef == null ? "NoChef" : chef.getName();
             logger.log("[" + getName() + "][" + chefName + "] Accepted Order#" + order.getOrderId());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -73,50 +77,59 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
     }
 
     @Override
-    public int queueSize() {
-        return queue.size();
-    }
-
-    @Override
     public boolean isRunning() {
         return running.get();
     }
 
     @Override
+    public int queueSize() {
+        return queue.size();
+    }
+
+    @Override
     public void run() {
         try {
-            while (!Thread.interrupted()) {
+            while (running.get()) {
                 Order order = queue.take();
 
-                order.setStatus(OrderStatus.ACCEPTED);
-                orderTracker.notifyUpdate(order);
-                billingService.addOrderToBill(order);
+                // === ACCEPTED ===
+                updateStatus(order, OrderStatus.ACCEPTED);
 
-
+                // === RESERVE INGREDIENTS ===
                 boolean reserved = inventoryService.reserveIngredients(order);
                 if (!reserved) {
-                    order.setStatus(OrderStatus.REJECTED);
-                    orderTracker.notifyUpdate(order);
+                    updateStatus(order, OrderStatus.REJECTED);
                     logger.log("[" + getName() + "] Rejected Order#" + order.getOrderId());
                     continue;
                 }
 
-                order.setStatus(OrderStatus.IN_PROGRESS);
-                orderTracker.notifyUpdate(order);
+                // === IN PROGRESS ===
+                updateStatus(order, OrderStatus.IN_PROGRESS);
 
+                // Actual cooking simulation from subclass
                 processOrder(order);
 
-                order.setStatus(OrderStatus.COMPLETED);
-                orderTracker.notifyUpdate(order);
+                // === COMPLETED ===
+                updateStatus(order, OrderStatus.COMPLETED);
 
-                billingService.addOrderToBill(order.getTableNumber(), order.getItem(), order.getQuantity());
+                // Billing ONLY on completed
+                billingService.addOrderToBill(order);
 
                 logger.log("[" + getName() + "] Completed Order#" + order.getOrderId());
             }
         } catch (InterruptedException ignored) {
+            // normal stop condition
         } finally {
             running.set(false);
         }
+    }
+
+    /**
+     * Unified status update logic to prevent multiple notifyUpdate() calls.
+     */
+    private void updateStatus(Order order, OrderStatus status) {
+        order.setStatus(status);
+        orderTracker.notifyUpdate(order);
     }
 
     protected abstract void processOrder(Order order) throws InterruptedException;

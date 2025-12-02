@@ -1,22 +1,15 @@
 package com.restaurantops.payment;
 
-import com.restaurantops.model.Bill;
-
-import java.util.Random;
-
-public class CardPayment implements PaymentStrategy {
-
-    private final Random random = new Random();
+public class CardPayment implements PaymentMethod {
 
     @Override
-    public boolean pay(Bill bill) {
-        System.out.println("Processing CARD payment for Table "
-                + bill.getTableNumber() + " | Amount: ₹" + bill.getTotalAmount());
-        return random.nextInt(10) != 0; // 10% fail chance
+    public boolean process(double amount) {
+        System.out.println("[PAYMENT] Card payment processed: ₹" + amount);
+        return true;
     }
 
     @Override
-    public String getName() {
-        return "CARD";
+    public String getMethodName() {
+        return "Card";
     }
 }

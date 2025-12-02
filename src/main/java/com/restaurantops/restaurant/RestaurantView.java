@@ -197,6 +197,5 @@ public class RestaurantView {
             System.out.println("Invalid input.");
         }
     }
+}
 
-}
-}
