@@ -1,7 +1,6 @@
-package com.restaurantops.service;
+package com.restaurantops.staff;
 
-import com.restaurantops.model.Chef;
-import com.restaurantops.model.Staff;
+import com.restaurantops.util.LoggerService;
 
 import java.util.ArrayList;
 import java.util.Collections;

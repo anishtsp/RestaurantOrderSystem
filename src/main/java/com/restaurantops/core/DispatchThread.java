@@ -2,7 +2,7 @@ package com.restaurantops.core;
 
 import com.restaurantops.model.Order;
 import com.restaurantops.service.KitchenRouterService;
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.util.LoggerService;
 
 import java.util.concurrent.PriorityBlockingQueue;
 

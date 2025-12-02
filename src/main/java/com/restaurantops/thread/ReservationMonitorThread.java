@@ -1,6 +1,6 @@
 package com.restaurantops.thread;
 
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.util.LoggerService;
 import com.restaurantops.service.ReservationService;
 
 public class ReservationMonitorThread implements Runnable {

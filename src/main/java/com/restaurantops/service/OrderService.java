@@ -2,6 +2,7 @@ package com.restaurantops.service;
 
 import com.restaurantops.core.RestaurantEngine;
 import com.restaurantops.model.Order;
+import com.restaurantops.util.LoggerService;
 
 import java.util.ArrayList;
 import java.util.Collections;

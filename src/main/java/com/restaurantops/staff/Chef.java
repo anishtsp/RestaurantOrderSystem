@@ -1,4 +1,4 @@
-package com.restaurantops.model;
+package com.restaurantops.staff;
 
 public class Chef extends Staff {
 

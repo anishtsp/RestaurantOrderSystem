@@ -1,6 +1,6 @@
 package com.restaurantops.core;
 
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.util.LoggerService;
 
 public class IdleMonitorThread implements Runnable {
 

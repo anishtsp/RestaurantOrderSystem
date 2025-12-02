@@ -1,6 +1,6 @@
 package com.restaurantops.kitchen;
 
-import com.restaurantops.model.Chef;
+import com.restaurantops.staff.Chef;
 
 public class StationContext {
 

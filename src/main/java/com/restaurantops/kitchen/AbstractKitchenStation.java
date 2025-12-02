@@ -1,11 +1,11 @@
 package com.restaurantops.kitchen;
 
-import com.restaurantops.model.Chef;
+import com.restaurantops.staff.Chef;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.OrderStatus;
-import com.restaurantops.service.BillingService;
-import com.restaurantops.service.InventoryService;
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.billing.BillingService;
+import com.restaurantops.inventory.InventoryService;
+import com.restaurantops.util.LoggerService;
 import com.restaurantops.tracking.OrderTracker;
 
 import java.util.concurrent.BlockingQueue;

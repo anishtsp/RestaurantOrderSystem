@@ -1,9 +1,10 @@
-package com.restaurantops.kitchen;
+package com.restaurantops.kitchen.stations;
 
+import com.restaurantops.kitchen.AbstractKitchenStation;
 import com.restaurantops.model.Order;
-import com.restaurantops.service.BillingService;
-import com.restaurantops.service.InventoryService;
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.billing.BillingService;
+import com.restaurantops.inventory.InventoryService;
+import com.restaurantops.util.LoggerService;
 import com.restaurantops.tracking.OrderTracker;
 
 public class DessertStation extends AbstractKitchenStation {

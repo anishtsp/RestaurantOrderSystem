@@ -1,8 +1,7 @@
-package com.restaurantops.thread;
+package com.restaurantops.inventory;
 
 import com.restaurantops.model.SupplierOrder;
-import com.restaurantops.service.InventoryService;
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.util.LoggerService;
 import com.restaurantops.service.SupplierService;
 
 public class DeliveryWorkerThread implements Runnable {

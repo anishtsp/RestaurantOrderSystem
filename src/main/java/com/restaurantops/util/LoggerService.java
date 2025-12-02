@@ -1,4 +1,4 @@
-package com.restaurantops.service;
+package com.restaurantops.util;
 
 import java.util.ArrayList;
 import java.util.Collections;

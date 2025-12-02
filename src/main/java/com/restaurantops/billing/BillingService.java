@@ -1,8 +1,8 @@
-package com.restaurantops.service;
+package com.restaurantops.billing;
 
 import com.restaurantops.model.Bill;
 import com.restaurantops.model.Order;
-import com.restaurantops.payment.PaymentMethod;
+import com.restaurantops.billing.payment.PaymentMethod;
 
 import java.util.HashMap;
 import java.util.Map;

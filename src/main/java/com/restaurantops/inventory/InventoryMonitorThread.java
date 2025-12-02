@@ -1,8 +1,7 @@
-package com.restaurantops.thread;
+package com.restaurantops.inventory;
 
 import com.restaurantops.model.InventoryItem;
-import com.restaurantops.service.InventoryService;
-import com.restaurantops.service.LoggerService;
+import com.restaurantops.util.LoggerService;
 import com.restaurantops.service.SupplierService;
 
 import java.util.Map;

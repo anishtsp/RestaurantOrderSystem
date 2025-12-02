@@ -1,4 +1,4 @@
-package com.restaurantops.payment;
+package com.restaurantops.billing.payment;
 
 public class UpiPayment implements PaymentMethod {
 

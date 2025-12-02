@@ -1,9 +1,11 @@
-package com.restaurantops.service;
+package com.restaurantops.inventory;
 
 import com.restaurantops.model.InventoryItem;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.Recipe;
+import com.restaurantops.util.LoggerService;
+import com.restaurantops.service.RecipeService;
 
 import java.util.HashMap;
 import java.util.Map;
