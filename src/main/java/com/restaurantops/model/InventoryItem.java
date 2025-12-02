@@ -43,4 +43,9 @@ public class InventoryItem {
         return name + " | qty=" + quantity +
                 " | expired=" + isExpired();
     }
+
+    public synchronized long getExpiryTimestamp() {
+        return expiryTimestamp;
+    }
+
 }

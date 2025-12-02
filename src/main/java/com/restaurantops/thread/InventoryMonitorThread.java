@@ -30,7 +30,7 @@ public class InventoryMonitorThread implements Runnable {
                 Map<String, InventoryItem> low = inventoryService.getLowStockItems();
                 if (!low.isEmpty()) {
                     logger.log("[INVENTORY] Low stock detected: " + low.keySet());
-                    low.forEach((name, item) -> supplierService.placeOrder(name, 20));
+                    low.forEach((name, item) -> supplierService.placeOrder(name, inventoryService.getReorderQuantity(name)));
                 }
 
                 Thread.sleep(3000);

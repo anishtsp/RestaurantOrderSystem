@@ -9,6 +9,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class InventoryService {
+    private final Map<String,Integer> reorderQuantities = new HashMap<>();
+
+    public void setReorderQuantity(String ingredient, int qty) {
+        reorderQuantities.put(ingredient.toLowerCase(), qty);
+    }
+
+    public int getReorderQuantity(String ingredient) {
+        return reorderQuantities.getOrDefault(ingredient.toLowerCase(), 20);
+    }
+
 
     private final Map<String, InventoryItem> inventory = new HashMap<>();
 
@@ -42,7 +52,7 @@ public class InventoryService {
             inventory.put(key, new InventoryItem(name, qty, expiryMillis));
         } else {
             existing.increase(qty);
-            if (expiryMillis > existingExpiry(existing)) {
+            if (expiryMillis > existing.getExpiryTimestamp()) {
                 existing.setExpiry(expiryMillis);
             }
         }
