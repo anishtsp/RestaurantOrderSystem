@@ -4,7 +4,7 @@ public class CardPayment implements PaymentMethod {
 
     @Override
     public boolean process(double amount) {
-        System.out.println("[PAYMENT] Card payment processed: ₹" + amount);
+        System.out.println("Processing CARD payment...");
         return true;
     }
 

@@ -4,7 +4,7 @@ public class UpiPayment implements PaymentMethod {
 
     @Override
     public boolean process(double amount) {
-        System.out.println("[PAYMENT] UPI payment processed: ₹" + amount);
+        System.out.println("Processing UPI payment...");
         return true;
     }
 

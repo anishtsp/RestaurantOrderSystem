@@ -11,23 +11,19 @@ public class BillingService {
 
     private final Map<Integer, Bill> bills = new HashMap<>();
 
-    private Bill getOrCreateBillInternal(int tableNumber) {
-        Bill b = bills.get(tableNumber);
-        if (b == null) {
-            b = new Bill(tableNumber);
-            bills.put(tableNumber, b);
-        }
-        return b;
+    public Bill getOrCreateBill(int tableNumber) {
+        return bills.computeIfAbsent(tableNumber, Bill::new);
+    }
+
+    public void addOrderToBill(Order order) {
+        Bill bill = getOrCreateBill(order.getTableNumber());
+        bill.addOrder(order);
+        System.out.println("[BILLING] Added Order#" + order.getOrderId() +
+                " to table " + order.getTableNumber());
     }
 
     public Bill getBill(int tableNumber) {
         return bills.get(tableNumber);
-    }
-
-    public void addOrderToBill(Order order) {
-        Bill bill = getOrCreateBillInternal(order.getTableNumber());
-        bill.addOrder(order);
-        System.out.println("[DEBUG] Billing received order ID " + order.getOrderId());
     }
 
     public void printAllBills() {
@@ -35,31 +31,31 @@ public class BillingService {
             System.out.println("No bills available.");
             return;
         }
-        for (Bill b : bills.values()) {
-            System.out.println(b);
-        }
+        bills.values().forEach(System.out::println);
     }
 
     public void processPayment(int tableNumber, PaymentMethod method) {
         Bill bill = bills.get(tableNumber);
+
         if (bill == null) {
-            System.out.println("No bill found for this table.");
+            System.out.println("No bill found for table " + tableNumber);
             return;
         }
 
         if (bill.isPaid()) {
-            System.out.println("Bill already paid.");
+            System.out.println("This bill is already paid.");
             return;
         }
 
-        boolean ok = method.process(bill.getTotalAmount());
-        if (ok) {
+        double amount = bill.getTotalAmount();
+        boolean success = method.process(amount);
+
+        if (success) {
             bill.markPaid();
-            System.out.println("Payment successful using: " + method.getMethodName());
-            System.out.println("--- Final Bill ---");
+            System.out.println("Payment SUCCESSFUL via " + method.getMethodName());
             System.out.println(bill);
         } else {
-            System.out.println("Payment failed.");
+            System.out.println("Payment FAILED via " + method.getMethodName());
         }
     }
 }

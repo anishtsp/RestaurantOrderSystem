@@ -52,12 +52,13 @@ public class RestaurantView {
             System.out.println("1. View All Orders");
             System.out.println("2. View Inventory");
             System.out.println("3. View Bills");
-            System.out.println("4. Process Payment");
-            System.out.println("5. View Reservations");
-            System.out.println("6. View Staff");
-            System.out.println("7. View Kitchen Stations Status");
-            System.out.println("8. Exit Restaurant View");
+            System.out.println("4. View Bill for Table");
+            System.out.println("5. Process Payment");
+            System.out.println("6. View Reservations");
+            System.out.println("7. View Staff");
+            System.out.println("8. View Kitchen Stations Status");
             System.out.println("9. View System Logs");
+            System.out.println("10. Exit Restaurant View");
             System.out.print("Choice: ");
 
             String choice = scanner.nextLine();
@@ -65,12 +66,13 @@ public class RestaurantView {
                 case "1" -> showOrders();
                 case "2" -> inventoryService.printInventory();
                 case "3" -> showBills();
-                case "4" -> processPayment();
-                case "5" -> showReservations();
-                case "6" -> showStaff();
-                case "7" -> showStations();
-                case "8" -> running = false;
+                case "4" -> viewBillForTable();
+                case "5" -> processPayment();
+                case "6" -> showReservations();
+                case "7" -> showStaff();
+                case "8" -> showStations();
                 case "9" -> showLogs();
+                case "10" -> running = false;
                 default -> System.out.println("Invalid option.");
             }
         }
@@ -163,21 +165,28 @@ public class RestaurantView {
         billingService.printAllBills();
     }
 
-    private void processPayment() {
+    private void viewBillForTable() {
         try {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
 
-            Bill bill = billingService.getBill(table);
+            var bill = billingService.getBill(table);
+
             if (bill == null) {
-                System.out.println("No bill found.");
-                return;
+                System.out.println("No bill found for this table.");
+            } else {
+                System.out.println(bill);
             }
 
-            if (bill.isPaid()) {
-                System.out.println("Bill already paid.");
-                return;
-            }
+        } catch (Exception e) {
+            System.out.println("Invalid input.");
+        }
+    }
+
+    private void processPayment() {
+        try {
+            System.out.print("Enter table number: ");
+            int table = Integer.parseInt(scanner.nextLine());
 
             System.out.println("Select payment method:");
             System.out.println("1. Cash");
@@ -192,7 +201,6 @@ public class RestaurantView {
                 case "3" -> billingService.processPayment(table, new UpiPayment());
                 default -> System.out.println("Invalid payment option.");
             }
-
         } catch (Exception e) {
             System.out.println("Invalid input.");
         }

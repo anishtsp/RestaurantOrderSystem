@@ -4,7 +4,7 @@ public class CashPayment implements PaymentMethod {
 
     @Override
     public boolean process(double amount) {
-        System.out.println("[PAYMENT] Cash payment processed: ₹" + amount);
+        System.out.println("Processing CASH payment...");
         return true;
     }
 
