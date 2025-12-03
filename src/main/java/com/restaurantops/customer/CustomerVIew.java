@@ -21,10 +21,9 @@ public class CustomerView {
     private final OrderService orderService;
     private final ReservationService reservationService;
     private final OrderTracker orderTracker;
-    private final Scanner scanner = new Scanner(System.in);
 
-    // needed to filter updates for the current customer
-    private Integer lastOrderedTable = null;
+    private final Scanner scanner = new Scanner(System.in);
+    private Integer lastTable = null;
 
     public CustomerView(RestaurantEngine engine) {
         this.menuService = engine.getMenuService();
@@ -32,7 +31,7 @@ public class CustomerView {
         this.reservationService = engine.getReservationService();
         this.orderTracker = engine.getOrderTracker();
 
-        // ⭐ Auto-subscribe for real-time status updates
+        // auto subscribe to order updates (filtered per table)
         this.orderTracker.addListener(new OrderListener() {
             @Override
             public void onOrderUpdated(Order order) {
@@ -42,27 +41,30 @@ public class CustomerView {
     }
 
     public void run() {
+        boolean running = true;
+
         System.out.println("=== Customer View ===");
 
-        boolean running = true;
         while (running) {
             System.out.println("\n1. Browse Menu");
             System.out.println("2. Place Order");
-            System.out.println("3. Exit Customer View");
+            System.out.println("3. View My Order Status");
             System.out.println("4. Reserve Table");
-            System.out.println("5. Subscribe to Order Updates (temporary)");
+            System.out.println("5. View My Reservations");
+            System.out.println("6. Exit Customer View");
             System.out.print("Choice: ");
-            String input = scanner.nextLine();
 
+            String input = scanner.nextLine();
             switch (input) {
                 case "1" -> browseMenu();
                 case "2" -> placeOrder();
-                case "3" -> {
-                    running = false;
-                    System.out.println("Exiting Customer View...");
-                }
+                case "3" -> viewOrderStatus();
                 case "4" -> reserveTable();
-                case "5" -> subscribeTemp();
+                case "5" -> viewReservations();
+                case "6" -> {
+                    System.out.println("Exiting Customer View...");
+                    running = false;
+                }
                 default -> System.out.println("Invalid option.");
             }
         }
@@ -78,20 +80,18 @@ public class CustomerView {
         try {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
-
-            // keep this so the listener can filter updates
-            lastOrderedTable = table;
+            lastTable = table;
 
             browseMenu();
             System.out.print("Enter menu item id: ");
             int id = Integer.parseInt(scanner.nextLine());
 
-            System.out.print("Enter quantity: ");
+            System.out.print("Quantity: ");
             int qty = Integer.parseInt(scanner.nextLine());
 
             MenuItem item = menuService.getById(id);
             if (item == null) {
-                System.out.println("Invalid menu item id.");
+                System.out.println("Invalid item id.");
                 return;
             }
 
@@ -101,83 +101,87 @@ public class CustomerView {
             System.out.print("Spice level (1-5): ");
             int spice = Integer.parseInt(scanner.nextLine());
 
-            System.out.print("Toppings (comma separated): ");
+            System.out.print("Toppings (comma-separated): ");
             String toppings = scanner.nextLine();
 
             Customization c = new Customization(cheese, spice, toppings);
+
             Order order = new Order(table, item, qty, c);
             orderService.placeOrder(order);
-            System.out.println("Your order has been placed: " + order);
 
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid number input.");
-        }
-    }
-
-    private void reserveTable() {
-        try {
-            System.out.print("Enter table number (1-10): ");
-            int table = Integer.parseInt(scanner.nextLine());
-
-            System.out.print("Enter your name: ");
-            String name = scanner.nextLine();
-
-            System.out.print("Start time offset (minutes from now): ");
-            int startOffset = Integer.parseInt(scanner.nextLine());
-
-            System.out.print("Duration (minutes): ");
-            int duration = Integer.parseInt(scanner.nextLine());
-
-            var start = LocalDateTime.now().plusMinutes(startOffset);
-            var end = start.plusMinutes(duration);
-
-            var r = reservationService.reserveTable(table, name, start, end);
-
-            if (r == null) System.out.println("Table not available!");
-            else System.out.println("Reservation confirmed:\n" + r);
+            System.out.println("Order placed successfully!");
+            System.out.println(order);
 
         } catch (Exception e) {
             System.out.println("Invalid input.");
         }
     }
 
-    private void subscribeTemp() {
-        System.out.print("Enter order id to subscribe (or press enter to subscribe all): ");
-        String s = scanner.nextLine();
-        OrderListener l = new OrderListener() {
-            @Override
-            public void onOrderUpdated(Order order) {
-                System.out.println("\n[TRACKING] Update: " + order);
-            }
-        };
-        orderTracker.addListener(l);
-        System.out.println("Subscribed to order updates (temporary for this session).");
-    }
-
-    // ⭐ NEW — automatically shows REJECTED, IN_PROGRESS, ACCEPTED, COMPLETED
-    private void handleOrderUpdate(Order order) {
-        // filter updates — only show updates for the customer's own table
-        if (lastOrderedTable == null) return;
-        if (order.getTableNumber() != lastOrderedTable) return;
-
-        System.out.println(); // spacing
-
-        if (order.getStatus() == OrderStatus.REJECTED) {
-            System.out.println("❌ Your order #" + order.getOrderId() + " was REJECTED.");
-            System.out.println("Reason: item out of stock / expired.");
+    private void viewOrderStatus() {
+        if (lastTable == null) {
+            System.out.println("You have not placed any orders yet.");
             return;
         }
 
-        if (order.getStatus() == OrderStatus.ACCEPTED) {
-            System.out.println("📦 Order #" + order.getOrderId() + " has been accepted by the kitchen.");
+        System.out.println("\n=== Your Orders (Table " + lastTable + ") ===");
+        orderService.getAllOrders().stream()
+                .filter(o -> o.getTableNumber() == lastTable)
+                .forEach(o -> System.out.println(
+                        "Order#" + o.getOrderId() +
+                                " - " + o.getItem().getName() +
+                                " - Status: " + o.getStatus()
+                ));
+    }
+
+    private void reserveTable() {
+        try {
+            System.out.print("Enter table number (1–10): ");
+            int table = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Enter your name: ");
+            String name = scanner.nextLine();
+
+            System.out.print("Start time offset (minutes from now): ");
+            int offset = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Duration (minutes): ");
+            int duration = Integer.parseInt(scanner.nextLine());
+
+            var start = LocalDateTime.now().plusMinutes(offset);
+            var end = start.plusMinutes(duration);
+
+            var r = reservationService.reserveTable(table, name, start, end);
+
+            if (r == null)
+                System.out.println("Table not available!");
+            else
+                System.out.println("Reservation confirmed:\n" + r);
+
+        } catch (Exception e) {
+            System.out.println("Invalid input.");
+        }
+    }
+
+    private void viewReservations() {
+        System.out.println("\n=== My Reservations ===");
+        reservationService.getAllReservations().forEach(System.out::println);
+    }
+
+    private void handleOrderUpdate(Order order) {
+        if (lastTable == null) return;
+        if (order.getTableNumber() != lastTable) return;
+
+        System.out.println();
+
+        if (order.getStatus() == OrderStatus.REJECTED) {
+            System.out.println("❌ Your order #" + order.getOrderId() + " was REJECTED.");
+            return;
         }
 
-        if (order.getStatus() == OrderStatus.IN_PROGRESS) {
-            System.out.println("⏳ Order #" + order.getOrderId() + " is now being prepared.");
-        }
-
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            System.out.println("✅ Order #" + order.getOrderId() + " is READY! Please collect.");
+        switch (order.getStatus()) {
+            case ACCEPTED -> System.out.println("📦 Order #" + order.getOrderId() + " accepted by kitchen.");
+            case IN_PROGRESS -> System.out.println("⏳ Order #" + order.getOrderId() + " is being prepared.");
+            case COMPLETED -> System.out.println("✅ Order #" + order.getOrderId() + " is ready!");
         }
     }
 }
