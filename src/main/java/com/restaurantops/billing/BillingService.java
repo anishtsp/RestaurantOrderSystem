@@ -11,7 +11,7 @@ public class BillingService {
 
     private final Map<Integer, Bill> bills = new HashMap<>();
 
-    public Bill getOrCreateBill(int tableNumber) {
+    private Bill getOrCreateBillInternal(int tableNumber) {
         Bill b = bills.get(tableNumber);
         if (b == null) {
             b = new Bill(tableNumber);
@@ -20,12 +20,14 @@ public class BillingService {
         return b;
     }
 
+    public Bill getBill(int tableNumber) {
+        return bills.get(tableNumber);
+    }
+
     public void addOrderToBill(Order order) {
-        int table = order.getTableNumber();
-        Bill bill = getOrCreateBill(table);
+        Bill bill = getOrCreateBillInternal(order.getTableNumber());
         bill.addOrder(order);
         System.out.println("[DEBUG] Billing received order ID " + order.getOrderId());
-
     }
 
     public void printAllBills() {

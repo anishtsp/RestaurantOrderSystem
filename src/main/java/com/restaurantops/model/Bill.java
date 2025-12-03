@@ -7,60 +7,61 @@ public class Bill {
 
     private final int tableNumber;
     private final List<Order> orders = new ArrayList<>();
-    private double totalAmount;
     private boolean paid = false;
 
     public Bill(int tableNumber) {
         this.tableNumber = tableNumber;
     }
 
-    public int getTableNumber() {
-        return tableNumber;
+    public void addOrder(Order order) {
+        if (order != null) {
+            orders.add(order);
+        }
+    }
+
+    public double getTotalAmount() {
+        double total = 0;
+
+        for (Order o : orders) {
+            MenuItem item = o.getItem();
+            if (item != null) {
+                total += item.getPrice() * o.getQuantity();
+            }
+        }
+
+        return total;
     }
 
     public boolean isPaid() {
         return paid;
     }
 
-    public double getTotalAmount() {
-        return totalAmount;
-    }
-
-    public void addOrder(Order order) {
-        orders.add(order);
-        recalculateTotal();
-    }
-
-    private void recalculateTotal() {
-        double sum = 0;
-        for (Order o : orders) {
-            sum += o.getItem().getPrice() * o.getQuantity();
-        }
-        this.totalAmount = sum;
-    }
-
     public void markPaid() {
-        this.paid = true;
-    }
-
-    public List<Order> getOrders() {
-        return orders;
+        paid = true;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+
         sb.append("=== BILL FOR TABLE ").append(tableNumber).append(" ===\n");
 
-        for (Order o : orders) {
-            sb.append(o.getItem().getName())
-                    .append(" x ").append(o.getQuantity())
-                    .append(" = ₹").append(o.getItem().getPrice() * o.getQuantity())
-                    .append("\n");
+        if (orders.isEmpty()) {
+            sb.append("No items.\n");
+        } else {
+            for (Order o : orders) {
+                MenuItem i = o.getItem();
+                sb.append(i.getName())
+                        .append(" x ")
+                        .append(o.getQuantity())
+                        .append(" = ₹")
+                        .append(i.getPrice() * o.getQuantity())
+                        .append("\n");
+            }
         }
 
-        sb.append("TOTAL: ₹").append(totalAmount).append("\n");
-        sb.append("STATUS: ").append(paid ? "PAID" : "UNPAID").append("\n");
+        sb.append("TOTAL: ₹").append(getTotalAmount()).append("\n");
+        sb.append("STATUS: ").append(paid ? "PAID" : "UNPAID");
 
         return sb.toString();
     }

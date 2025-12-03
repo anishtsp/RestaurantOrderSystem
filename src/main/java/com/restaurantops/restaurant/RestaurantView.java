@@ -168,7 +168,7 @@ public class RestaurantView {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
 
-            Bill bill = billingService.getOrCreateBill(table);
+            Bill bill = billingService.getBill(table);
             if (bill == null) {
                 System.out.println("No bill found.");
                 return;

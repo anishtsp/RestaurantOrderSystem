@@ -2,10 +2,10 @@ package com.restaurantops.service;
 
 import com.restaurantops.billing.BillingService;
 import com.restaurantops.inventory.InventoryService;
+import com.restaurantops.kitchen.KitchenStation;
 import com.restaurantops.kitchen.stations.BeverageStation;
 import com.restaurantops.kitchen.stations.DessertStation;
 import com.restaurantops.kitchen.stations.GrillStation;
-import com.restaurantops.kitchen.KitchenStation;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.OrderCategory;
@@ -25,6 +25,7 @@ public class KitchenRouterService {
                                 BillingService billingService,
                                 OrderTracker tracker,
                                 LoggerService logger) {
+
         this.logger = logger;
 
         GrillStation grill = new GrillStation(inventoryService, billingService, tracker, logger);
@@ -36,6 +37,7 @@ public class KitchenRouterService {
         stations.put(OrderCategory.BEVERAGE, beverage);
     }
 
+
     public void startAllStations() {
         stations.values().forEach(KitchenStation::start);
     }
@@ -44,26 +46,50 @@ public class KitchenRouterService {
         stations.values().forEach(KitchenStation::stop);
     }
 
-    public OrderCategory categoryFor(MenuItem item) {
+
+    private OrderCategory detectCategoryFromName(MenuItem item) {
+
+        if (item == null || item.getName() == null) return OrderCategory.UNKNOWN;
+
         String name = item.getName().toLowerCase();
-        if (name.contains("pizza") || name.contains("burger") || name.contains("pasta")) return OrderCategory.GRILL;
-        if (name.contains("lemonade") || name.contains("juice") || name.contains("water")) return OrderCategory.BEVERAGE;
-        if (name.contains("cake") || name.contains("dessert") || name.contains("gulab")) return OrderCategory.DESSERT;
+
+        if (name.contains("pizza") || name.contains("burger") || name.contains("pasta"))
+            return OrderCategory.GRILL;
+
+        if (name.contains("lemonade") || name.contains("juice") || name.contains("water"))
+            return OrderCategory.BEVERAGE;
+
+        if (name.contains("cake") || name.contains("dessert") || name.contains("gulab"))
+            return OrderCategory.DESSERT;
+
         return OrderCategory.UNKNOWN;
     }
 
+
     public void route(Order order) {
+
         OrderCategory cat = order.getCategory();
+
         if (cat == null || cat == OrderCategory.UNKNOWN) {
-            cat = categoryFor(order.getItem());
+            cat = detectCategoryFromName(order.getItem());
             order.setCategory(cat);
         }
-        KitchenStation station = stations.getOrDefault(cat, stations.get(OrderCategory.GRILL));
-        logger.log("[ROUTER] Routed Order#" + order.getOrderId() + " -> " + station.getName());
+
+        // fallback grill if truly unknown
+        KitchenStation station = stations.getOrDefault(
+                cat,
+                stations.get(OrderCategory.GRILL)
+        );
+
+        logger.log("[ROUTER] Routing Order#" + order.getOrderId() +
+                " -> " + station.getName() + " (" + cat + ")");
+
         station.acceptOrder(order);
     }
 
+
     public Map<OrderCategory, KitchenStation> getStations() {
+        // prevent accidental modification
         return Collections.unmodifiableMap(stations);
     }
 }

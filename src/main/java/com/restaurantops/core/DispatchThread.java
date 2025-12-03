@@ -15,6 +15,7 @@ public class DispatchThread implements Runnable {
     public DispatchThread(PriorityBlockingQueue<Order> queue,
                           KitchenRouterService router,
                           LoggerService logger) {
+
         this.queue = queue;
         this.router = router;
         this.logger = logger;
@@ -24,11 +25,18 @@ public class DispatchThread implements Runnable {
     public void run() {
         try {
             while (!Thread.interrupted()) {
+
+                // Blocking until an order is ready
                 Order order = queue.take();
+
                 logger.log("[DISPATCH] Order#" + order.getOrderId() + " dispatched");
+
+                // Forward to the correct kitchen station
                 router.route(order);
             }
+
         } catch (InterruptedException ignored) {
+            // Normal shutdown
         }
     }
 }

@@ -4,27 +4,28 @@ import com.restaurantops.model.InventoryItem;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.Recipe;
-import com.restaurantops.util.LoggerService;
 import com.restaurantops.service.RecipeService;
+import com.restaurantops.util.LoggerService;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Thread-safe inventory service responsible for:
+ * - Reserving ingredients
+ * - Removing expired stock
+ * - Reporting low-stock conditions
+ * - Restocking and updating expiries
+ */
 public class InventoryService {
-    private final Map<String,Integer> reorderQuantities = new HashMap<>();
 
-    public void setReorderQuantity(String ingredient, int qty) {
-        reorderQuantities.put(ingredient.toLowerCase(), qty);
-    }
-
-    public int getReorderQuantity(String ingredient) {
-        return reorderQuantities.getOrDefault(ingredient.toLowerCase(), 20);
-    }
-
+    private static final int DEFAULT_THRESHOLD = 5;
+    private static final int DEFAULT_REORDER_QTY = 20;
 
     private final Map<String, InventoryItem> inventory = new HashMap<>();
-
     private final Map<String, Integer> reorderThresholds = new HashMap<>();
+    private final Map<String, Integer> reorderQuantities = new HashMap<>();
 
     private final RecipeService recipeService;
     private final LoggerService logger;
@@ -34,149 +35,169 @@ public class InventoryService {
         this.logger = logger;
     }
 
-
-    private long existingExpiry(InventoryItem item) {
-        try {
-            var field = InventoryItem.class.getDeclaredField("expiryTimestamp");
-            field.setAccessible(true);
-            return field.getLong(item);
-        } catch (Exception e) {
-            return 0;
-        }
+    // Normalize ingredient names
+    private String key(String name) {
+        return name.toLowerCase().trim();
     }
 
+    // ----------------------------
+    //  ADD / RESTOCK
+    // ----------------------------
 
     public synchronized void addItem(String name, int qty, long expiryMillis) {
-        String key = name.toLowerCase();
-        InventoryItem existing = inventory.get(key);
+        String k = key(name);
+        InventoryItem item = inventory.get(k);
 
-        if (existing == null) {
-            inventory.put(key, new InventoryItem(name, qty, expiryMillis));
+        if (item == null) {
+            inventory.put(k, new InventoryItem(name, qty, expiryMillis));
         } else {
-            existing.increase(qty);
-            if (expiryMillis > existing.getExpiryTimestamp()) {
-                existing.setExpiry(expiryMillis);
+            item.increase(qty);
+            if (expiryMillis > item.getExpiryTimestamp()) {
+                item.setExpiry(expiryMillis);
             }
         }
     }
 
     public synchronized void restock(String name, int qty, long newExpiryMillis) {
-        String key = name.toLowerCase();
-        InventoryItem item = inventory.get(key);
+        String k = key(name);
+        InventoryItem existing = inventory.get(k);
 
-        if (item == null) {
-            inventory.put(key, new InventoryItem(name, qty, newExpiryMillis));
+        if (existing == null) {
+            inventory.put(k, new InventoryItem(name, qty, newExpiryMillis));
         } else {
-            item.increase(qty);
-            item.setExpiry(newExpiryMillis);
+            existing.increase(qty);
+            existing.setExpiry(newExpiryMillis);
         }
 
         logger.log("[INVENTORY] Restocked " + qty + " x " + name);
     }
 
+    // ----------------------------
+    //  RESERVATION LOGIC
+    // ----------------------------
 
     public synchronized boolean reserveIngredients(Order order) {
         if (order == null || order.getItem() == null) return false;
 
         MenuItem item = order.getItem();
-        String dish = item.getName().toLowerCase();
+        Recipe recipe = recipeService.getRecipeForDish(key(item.getName()));
 
-        Recipe recipe = recipeService.getRecipeForDish(dish);
         if (recipe == null) {
-            return reserveSingleItem(dish, order.getQuantity());
-        } else {
-            return reserveRecipe(recipe, order.getQuantity());
+            return reserveSingleItem(key(item.getName()), order.getQuantity());
         }
+
+        return reserveRecipe(recipe, order.getQuantity());
     }
 
     private boolean reserveSingleItem(String key, int qty) {
         InventoryItem inv = inventory.get(key);
-
-        if (inv == null) return false;
-        if (inv.isExpired()) return false;
+        if (inv == null || inv.isExpired()) return false;
 
         synchronized (inv) {
             if (inv.getQuantity() < qty) return false;
             inv.reduce(qty);
-            logger.log("[INVENTORY] Reserved " + qty + " x " + key);
-            return true;
         }
+
+        logger.log("[INVENTORY] Reserved " + qty + " x " + key);
+        return true;
     }
 
+    /**
+     * Recipe-based reservation (atomic):
+     * 1. Verify all ingredients
+     * 2. Deduct all ingredients together
+     */
     public synchronized boolean reserveRecipe(Recipe recipe, int servings) {
         Map<String, Integer> needed = new HashMap<>();
 
+        // Phase 1 — Verify availability
         for (Map.Entry<String, Integer> e : recipe.getIngredients().entrySet()) {
-            String key = e.getKey().toLowerCase();
-            int perServing = e.getValue() == null ? 0 : e.getValue();
+            String ing = key(e.getKey());
+            int perServing = e.getValue();
             int totalNeeded = perServing * Math.max(1, servings);
 
-            InventoryItem inv = inventory.get(key);
+            InventoryItem inv = inventory.get(ing);
             if (inv == null) {
-                logger.log("[INVENTORY] Missing ingredient " + key + " for " + recipe.getDishName());
+                logger.log("[INVENTORY] Missing ingredient: " + ing);
                 return false;
             }
             if (inv.isExpired()) {
-                logger.log("[INVENTORY] Ingredient expired: " + key);
+                logger.log("[INVENTORY] Ingredient expired: " + ing);
                 return false;
             }
             if (inv.getQuantity() < totalNeeded) {
-                logger.log("[INVENTORY] Not enough " + key + " for " + recipe.getDishName());
+                logger.log("[INVENTORY] Not enough " + ing + " for " + recipe.getDishName());
                 return false;
             }
-            needed.put(key, totalNeeded);
+
+            needed.put(ing, totalNeeded);
         }
 
+        // Phase 2 — Deduct all ingredients
         for (Map.Entry<String, Integer> e : needed.entrySet()) {
-            String k = e.getKey();
-            int q = e.getValue();
-            InventoryItem inv = inventory.get(k);
+            String ing = e.getKey();
+            int qty = e.getValue();
+
+            InventoryItem inv = inventory.get(ing);
             synchronized (inv) {
-                inv.reduce(q);
+                inv.reduce(qty);
             }
-            logger.log("[INVENTORY] Reserved " + q + " x " + k + " for " + recipe.getDishName());
+            logger.log("[INVENTORY] Reserved " + qty + " x " + ing + " for " + recipe.getDishName());
         }
 
         return true;
     }
 
+    // ----------------------------
+    //  EXPIRY MANAGEMENT
+    // ----------------------------
 
-    public void refreshExpiries() {
+    public synchronized void refreshExpiries() {
         inventory.values().removeIf(InventoryItem::isExpired);
     }
 
+    // ----------------------------
+    //  LOW STOCK + REORDER RULES
+    // ----------------------------
 
     public synchronized void setReorderThreshold(String ingredient, int threshold) {
-        reorderThresholds.put(ingredient.toLowerCase(), threshold);
+        reorderThresholds.put(key(ingredient), threshold);
     }
 
     public synchronized int getThresholdFor(String ingredient) {
-        return reorderThresholds.getOrDefault(ingredient.toLowerCase(), 5); // default threshold = 5
+        return reorderThresholds.getOrDefault(key(ingredient), DEFAULT_THRESHOLD);
+    }
+
+    public synchronized void setReorderQuantity(String ingredient, int qty) {
+        reorderQuantities.put(key(ingredient), qty);
+    }
+
+    public synchronized int getReorderQuantity(String ingredient) {
+        return reorderQuantities.getOrDefault(key(ingredient), DEFAULT_REORDER_QTY);
     }
 
     public synchronized Map<String, InventoryItem> getLowStockItems() {
         Map<String, InventoryItem> low = new HashMap<>();
 
         for (Map.Entry<String, InventoryItem> e : inventory.entrySet()) {
-            String key = e.getKey();
+            String ing = e.getKey();
             InventoryItem item = e.getValue();
-
-            int threshold = getThresholdFor(key);
-            if (item.getQuantity() <= threshold) {
-                low.put(key, item);
+            if (item.getQuantity() <= getThresholdFor(ing)) {
+                low.put(ing, item);
             }
         }
         return low;
     }
 
+    // ----------------------------
+    //  UTILITIES
+    // ----------------------------
 
     public void printInventory() {
-        for (InventoryItem i : inventory.values()) {
-            System.out.println(i);
-        }
+        inventory.values().forEach(System.out::println);
     }
 
     public Map<String, InventoryItem> getInventory() {
-        return inventory;
+        return Collections.unmodifiableMap(inventory);
     }
 }

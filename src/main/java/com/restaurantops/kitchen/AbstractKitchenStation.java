@@ -52,8 +52,8 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
         try {
             queue.put(order);
             Chef chef = getAssignedChef();
-            String chefName = chef == null ? "NoChef" : chef.getName();
-            logger.log("[" + getName() + "][" + chefName + "] Accepted Order#" + order.getOrderId());
+            logger.log("[" + getName() + "][" + (chef == null ? "NoChef" : chef.getName()) +
+                    "] Accepted Order#" + order.getOrderId());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -89,15 +89,16 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
     @Override
     public void run() {
         try {
-            while (running.get()) {
+            while (running.get() && !Thread.currentThread().isInterrupted()) {
+
                 Order order = queue.take();
 
                 // === ACCEPTED ===
                 updateStatus(order, OrderStatus.ACCEPTED);
 
-                // === RESERVE INGREDIENTS ===
-                boolean reserved = inventoryService.reserveIngredients(order);
-                if (!reserved) {
+                // === INGREDIENT CHECK ===
+                boolean ok = inventoryService.reserveIngredients(order);
+                if (!ok) {
                     updateStatus(order, OrderStatus.REJECTED);
                     logger.log("[" + getName() + "] Rejected Order#" + order.getOrderId());
                     continue;
@@ -106,27 +107,23 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
                 // === IN PROGRESS ===
                 updateStatus(order, OrderStatus.IN_PROGRESS);
 
-                // Actual cooking simulation from subclass
+                // actual cooking simulation
                 processOrder(order);
 
                 // === COMPLETED ===
                 updateStatus(order, OrderStatus.COMPLETED);
 
-                // Billing ONLY on completed
                 billingService.addOrderToBill(order);
 
                 logger.log("[" + getName() + "] Completed Order#" + order.getOrderId());
             }
+
         } catch (InterruptedException ignored) {
-            // normal stop condition
         } finally {
             running.set(false);
         }
     }
 
-    /**
-     * Unified status update logic to prevent multiple notifyUpdate() calls.
-     */
     private void updateStatus(Order order, OrderStatus status) {
         order.setStatus(status);
         orderTracker.notifyUpdate(order);
