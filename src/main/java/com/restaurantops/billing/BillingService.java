@@ -34,6 +34,11 @@ public class BillingService {
         bills.values().forEach(System.out::println);
     }
 
+    public Map<Integer, Bill> getAllBills() {
+        return bills;
+    }
+
+
     public void processPayment(int tableNumber, PaymentMethod method) {
         Bill bill = bills.get(tableNumber);
 
