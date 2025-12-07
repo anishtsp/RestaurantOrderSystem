@@ -7,13 +7,8 @@ import com.restaurantops.inventory.InventoryMonitorThread;
 import com.restaurantops.inventory.InventoryService;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
-import com.restaurantops.service.RecipeService;
-import com.restaurantops.core.DispatchThread;
-import com.restaurantops.service.KitchenRouterService;
-import com.restaurantops.service.OrderPriorityComparator;
-import com.restaurantops.service.OrderService;
-import com.restaurantops.service.ReservationService;
-import com.restaurantops.service.SupplierService;
+import com.restaurantops.model.Waiter;
+import com.restaurantops.service.*;
 import com.restaurantops.staff.Chef;
 import com.restaurantops.staff.StaffService;
 import com.restaurantops.thread.ReservationMonitorThread;
@@ -32,7 +27,7 @@ public class RestaurantEngine {
     private final LoggerService logger;
     private final OrderTracker orderTracker;
     private final RecipeService recipeService;
-    private final com.restaurantops.service.MenuService menuService;
+    private final MenuService menuService;
     private final InventoryService inventoryService;
     private final BillingService billingService;
     private final ReservationService reservationService;
@@ -51,6 +46,9 @@ public class RestaurantEngine {
     private Thread reservationThread;
     private Thread idleMonitorThread;
 
+    private TableService tableService;
+    private WaiterService waiterService;
+
     private long lastOrderTime;
     private volatile boolean stationsPaused = false;
     private volatile boolean started = false;
@@ -60,7 +58,7 @@ public class RestaurantEngine {
         orderTracker = new OrderTracker();
         recipeService = new RecipeService();
 
-        menuService = new com.restaurantops.service.MenuService(recipeService);
+        menuService = new MenuService(recipeService);
         inventoryService = new InventoryService(recipeService, logger);
 
         billingService = new BillingService();
@@ -71,6 +69,9 @@ public class RestaurantEngine {
 
         priorityQueue = new PriorityBlockingQueue<>(11, new OrderPriorityComparator());
         orderService = new OrderService(priorityQueue, logger);
+
+        waiterService = new WaiterService(logger);
+        tableService = new TableService(reservationService, waiterService, logger);
 
         lastOrderTime = System.currentTimeMillis();
     }
@@ -88,7 +89,6 @@ public class RestaurantEngine {
         InventoryInitializer.syncMenuToInventory(menuList, inventoryService);
         logger.log("[ENGINE] Inventory auto-loaded from menu");
 
-        // sensible defaults
         inventoryService.setReorderThreshold("dough", 5);
         inventoryService.setReorderThreshold("cheese", 5);
         inventoryService.setReorderThreshold("tomato_sauce", 5);
@@ -111,6 +111,34 @@ public class RestaurantEngine {
         staffService.addStaff(new Chef(1, "Ravi"));
         staffService.addStaff(new Chef(2, "Arjun"));
         staffService.addStaff(new Chef(3, "Meera"));
+        staffService.addStaff(new Chef(4, "Pooja"));
+        staffService.addStaff(new Chef(5, "John"));
+
+        if (this.getTableService().listTables().isEmpty()) {
+            for (int t = 1; t <= 10; t++) {
+                this.getTableService().addTable(t);
+            }
+            logger.log("[ENGINE] Preloaded 10 tables");
+        }
+
+        if (this.getWaiterService().getWaiters().isEmpty()) {
+            this.getWaiterService().addWaiter(101, "Amit");
+            this.getWaiterService().addWaiter(102, "Priya");
+            this.getWaiterService().addWaiter(103, "Karan");
+            this.getWaiterService().addWaiter(104, "Kumar");
+            this.getWaiterService().addWaiter(105, "Arya");
+            logger.log("[ENGINE] Preloaded 5 waiters");
+        }
+
+        for (int t = 1; t <= 10; t++) {
+            com.restaurantops.model.Waiter w = this.getWaiterService().assignNextAvailableWaiter();
+            if (w != null) {
+                this.getTableService().assignWaiterToTable(t, w);
+                logger.log("[ASSIGN] Waiter " + w.getName() + " -> Table " + t);
+            }
+        }
+
+
 
         routerService.getStations().forEach((cat, station) -> {
             Chef chef = staffService.findAvailableChef();
@@ -149,8 +177,8 @@ public class RestaurantEngine {
         idleMonitorThread = new Thread(
                 new IdleMonitorThread(
                         this,
-                        5000,        // check every 5 seconds
-                        TimeUnit.MINUTES.toMillis(5), // idle threshold: 5 minutes
+                        5000,
+                        TimeUnit.MINUTES.toMillis(5),
                         logger
                 ),
                 "IdleMonitor"
@@ -166,19 +194,15 @@ public class RestaurantEngine {
 
         logger.log("[ENGINE] Stopping...");
 
-        // stop accepting new work
         if (dispatchWorker != null) dispatchWorker.interrupt();
 
-        // stop stations first (prevents new billing)
         if (routerService != null) routerService.stopAllStations();
 
-        // interrupt background threads
         if (inventoryThread != null) inventoryThread.interrupt();
         if (deliveryThread != null) deliveryThread.interrupt();
         if (reservationThread != null) reservationThread.interrupt();
         if (idleMonitorThread != null) idleMonitorThread.interrupt();
 
-        // attempt graceful joins (best-effort)
         try {
             if (dispatchWorker != null) dispatchWorker.join(500);
             if (inventoryThread != null) inventoryThread.join(500);
@@ -193,9 +217,6 @@ public class RestaurantEngine {
         logger.log("[ENGINE] Stopped");
     }
 
-    /**
-     * Called when a new order arrives into system (used by OrderService)
-     */
     public void notifyNewOrder(Order order) {
         Objects.requireNonNull(order);
         lastOrderTime = System.currentTimeMillis();
@@ -228,7 +249,7 @@ public class RestaurantEngine {
         return logger;
     }
 
-    public com.restaurantops.service.MenuService getMenuService() {
+    public MenuService getMenuService() {
         return menuService;
     }
 
@@ -258,6 +279,14 @@ public class RestaurantEngine {
 
     public KitchenRouterService getRouterService() {
         return routerService;
+    }
+
+    public TableService getTableService() {
+        return tableService;
+    }
+
+    public WaiterService getWaiterService() {
+        return waiterService;
     }
 
     public boolean isStarted() {

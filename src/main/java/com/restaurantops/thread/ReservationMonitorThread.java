@@ -1,7 +1,7 @@
 package com.restaurantops.thread;
 
-import com.restaurantops.util.LoggerService;
 import com.restaurantops.service.ReservationService;
+import com.restaurantops.util.LoggerService;
 
 public class ReservationMonitorThread implements Runnable {
 
@@ -16,13 +16,13 @@ public class ReservationMonitorThread implements Runnable {
 
     @Override
     public void run() {
-        try {
-            while (!Thread.interrupted()) {
-                Thread.sleep(30000);
-                reservationService.expireOldReservations();
-                logger.log("[RESERVATION] Expired old reservations");
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                reservationService.clearPastReservations();
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                return;
             }
-        } catch (InterruptedException ignored) {
         }
     }
 }

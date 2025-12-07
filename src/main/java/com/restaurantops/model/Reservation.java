@@ -1,45 +1,52 @@
 package com.restaurantops.model;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Reservation {
 
-    private final String id;
+    private static final AtomicInteger GEN = new AtomicInteger(1);
+
+    private final int reservationId;
     private final int tableNumber;
-    private final String customerName;
-    private final LocalDateTime startTime;
-    private final LocalDateTime endTime;
-    private boolean active;
+    private final LocalDateTime start;
+    private final LocalDateTime end;
 
-    public Reservation(int tableNumber, String customerName,
-                       LocalDateTime startTime, LocalDateTime endTime) {
-
-        this.id = UUID.randomUUID().toString();
+    public Reservation(int tableNumber,
+                       LocalDateTime start,
+                       LocalDateTime end) {
+        this.reservationId = GEN.getAndIncrement();
         this.tableNumber = tableNumber;
-        this.customerName = customerName;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.active = true;
+        this.start = start;
+        this.end = end;
     }
 
-    public String getId() { return id; }
-    public int getTableNumber() { return tableNumber; }
-    public String getCustomerName() { return customerName; }
-    public LocalDateTime getStartTime() { return startTime; }
-    public LocalDateTime getEndTime() { return endTime; }
-    public boolean isActive() { return active; }
+    public int getReservationId() {
+        return reservationId;
+    }
 
-    public void expire() {
-        this.active = false;
+    public int getTableNumber() {
+        return tableNumber;
+    }
+
+
+
+    public LocalDateTime getStart() {
+        return start;
+    }
+
+    public LocalDateTime getEnd() {
+        return end;
+    }
+
+    public boolean overlaps(LocalDateTime s, LocalDateTime e) {
+        return !(e.isBefore(start) || s.isAfter(end));
     }
 
     @Override
     public String toString() {
-        return "[Reservation " + id.substring(0, 6) +
-                "] Table " + tableNumber +
-                " | " + customerName +
-                " | " + startTime + " to " + endTime +
-                " | active=" + active;
+        return "Reservation#" + reservationId +
+                " | Table " + tableNumber +
+                " | " + start + " → " + end;
     }
 }

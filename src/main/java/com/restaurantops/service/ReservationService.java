@@ -3,48 +3,51 @@ package com.restaurantops.service;
 import com.restaurantops.model.Reservation;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ReservationService {
 
-    private final Map<Integer, Reservation> reservations =
-            new ConcurrentHashMap<>();
-
-    public boolean isTableAvailable(int tableNumber, LocalDateTime start, LocalDateTime end) {
-        Reservation r = reservations.get(tableNumber);
-        if (r == null || !r.isActive()) return true;
-
-        // Overlap check
-        boolean overlap =
-                !(end.isBefore(r.getStartTime()) || start.isAfter(r.getEndTime()));
-
-        return !overlap;
-    }
-
-    public Reservation reserveTable(int tableNumber, String customerName,
-                                    LocalDateTime start, LocalDateTime end) {
-
-        if (!isTableAvailable(tableNumber, start, end))
-            return null;
-
-        Reservation r = new Reservation(tableNumber, customerName, start, end);
-        reservations.put(tableNumber, r);
-        return r;
-    }
-
-    public void expireOldReservations() {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-
-        for (Reservation r : reservations.values()) {
-            if (r.isActive() && r.getEndTime().isBefore(now)) {
-                r.expire();
-                System.out.println("[RESERVATION] Expired: " + r);
-            }
-        }
-    }
+    private final Map<Integer, Reservation> reservations = new ConcurrentHashMap<>();
 
     public Collection<Reservation> getAllReservations() {
         return reservations.values();
+    }
+
+    public Reservation getReservation(int reservationId) {
+        return reservations.get(reservationId);
+    }
+
+    public synchronized Reservation reserveTable(int tableNumber,
+                                                 LocalDateTime start,
+                                                 LocalDateTime end) {
+
+        for (Reservation r : reservations.values()) {
+            if (r.getTableNumber() == tableNumber &&
+                    r.overlaps(start, end)) {
+                return null;
+            }
+        }
+
+        Reservation r = new Reservation(tableNumber, start, end);
+        reservations.put(r.getReservationId(), r);
+        return r;
+    }
+
+    public Reservation getById(int id) {
+        return reservations.get(id);
+    }
+
+    public boolean cancel(int reservationId) {
+        reservations.remove(reservationId);
+        return false;
+    }
+
+
+
+    public synchronized void clearPastReservations() {
+        LocalDateTime now = LocalDateTime.now();
+        reservations.values().removeIf(r -> r.getEnd().isBefore(now));
     }
 }
