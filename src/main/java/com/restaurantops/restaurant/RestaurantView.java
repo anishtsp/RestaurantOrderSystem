@@ -62,8 +62,8 @@ public class RestaurantView {
             System.out.println("7. System Diagnostics");
             System.out.println("8. Exit");
             System.out.print("Choice: ");
-            String choice = scanner.nextLine();
-            switch (choice) {
+
+            switch (scanner.nextLine()) {
                 case "1" -> kitchenAndStaffMenu();
                 case "2" -> inventoryMenu();
                 case "3" -> billingMenu();
@@ -89,6 +89,7 @@ public class RestaurantView {
             System.out.println("6. Assign Chef to Station");
             System.out.println("7. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> showStations();
                 case "2" -> {
@@ -117,6 +118,7 @@ public class RestaurantView {
             System.out.println("3. View Low Stock Items");
             System.out.println("4. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> inventoryService.printInventory();
                 case "2" -> manualRestock();
@@ -136,16 +138,16 @@ public class RestaurantView {
             System.out.println("3. Process Payment");
             System.out.println("4. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> billingService.printAllBills();
                 case "2" -> {
                     System.out.print("Table number: ");
                     try {
                         int t = Integer.parseInt(scanner.nextLine());
-                        Bill b = billingService.getOrCreateBill(t);
-                        System.out.println(b);
+                        System.out.println(billingService.getOrCreateBill(t));
                     } catch (Exception e) {
-                        System.out.println("Invalid input.");
+                        System.out.println("Invalid.");
                     }
                 }
                 case "3" -> processPayment();
@@ -161,14 +163,13 @@ public class RestaurantView {
             System.out.println("\n=== ORDERS ===");
             System.out.println("1. View All Orders");
             System.out.println("2. View Active Orders");
-            System.out.println("3. Cancel Order");
-            System.out.println("4. Back");
+            System.out.println("3. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> viewAllOrders();
                 case "2" -> viewActiveOrders();
-                case "3" -> cancelOrder();
-                case "4" -> loop = false;
+                case "3" -> loop = false;
                 default -> System.out.println("Invalid.");
             }
         }
@@ -183,6 +184,7 @@ public class RestaurantView {
             System.out.println("3. Cancel Reservation");
             System.out.println("4. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> showReservations();
                 case "2" -> createReservation();
@@ -210,6 +212,7 @@ public class RestaurantView {
             System.out.println("11. Unassign Waiter from Table");
             System.out.println("12. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> listTables();
                 case "2" -> addTable();
@@ -232,23 +235,18 @@ public class RestaurantView {
         boolean loop = true;
         while (loop) {
             System.out.println("\n=== SYSTEM DIAGNOSTICS ===");
-            System.out.println("1. View Logs (last entries)");
-            System.out.println("2. View Thread Status");
+            System.out.println("1. View Logs");
+            System.out.println("2. Thread Status");
             System.out.println("3. Pause Stations");
             System.out.println("4. Resume Stations");
             System.out.println("5. Back");
             System.out.print("Choice: ");
+
             switch (scanner.nextLine()) {
                 case "1" -> showLogs();
                 case "2" -> showThreadStatus();
-                case "3" -> {
-                    engine.pauseStationsForIdle();
-                    System.out.println("Stations paused.");
-                }
-                case "4" -> {
-                    engine.resumeStationsOnActivity();
-                    System.out.println("Stations resumed.");
-                }
+                case "3" -> engine.pauseStationsForIdle();
+                case "4" -> engine.resumeStationsOnActivity();
                 case "5" -> loop = false;
                 default -> System.out.println("Invalid.");
             }
@@ -257,25 +255,21 @@ public class RestaurantView {
 
     private void showStations() {
         System.out.println("\n=== KITCHEN STATIONS ===");
-        Map<OrderCategory, ?> stations = routerService.getStations();
-        if (stations == null || stations.isEmpty()) {
-            System.out.println("No stations configured.");
-            return;
-        }
-        stations.forEach((cat, st) -> {
-            String name = st instanceof Object ? st.getClass().getSimpleName() : st.toString();
-            System.out.println(cat + " -> " + name);
-        });
+        var stations = routerService.getStations();
+        stations.forEach((cat, station) ->
+                System.out.println(cat + " → " + station.getName())
+        );
     }
 
     private void showStaff() {
-        System.out.println("\n=== STAFF ===");
-        List<Staff> staff = staffService.getAllStaff();
-        if (staff.isEmpty()) {
+        var list = staffService.getAllStaff();
+        if (list.isEmpty()) {
             System.out.println("No staff.");
             return;
         }
-        staff.forEach(s -> System.out.println(s.getStaffId() + " | " + s.getName() + " | " + s.getRole()));
+        list.forEach(s -> System.out.println(
+                s.getStaffId() + " | " + s.getName() + " | " + s.getRole()
+        ));
     }
 
     private void addStaff() {
@@ -284,12 +278,10 @@ public class RestaurantView {
             int id = Integer.parseInt(scanner.nextLine());
             System.out.print("Name: ");
             String name = scanner.nextLine();
-            System.out.print("Role (CHEF/WAITER/MANAGER): ");
-            String role = scanner.nextLine();
             staffService.addStaff(new Chef(id, name));
             System.out.println("Added.");
         } catch (Exception e) {
-            System.out.println("Invalid input.");
+            System.out.println("Invalid.");
         }
     }
 
@@ -297,48 +289,44 @@ public class RestaurantView {
         try {
             System.out.print("Chef staff id: ");
             int id = Integer.parseInt(scanner.nextLine());
-            Staff s = staffService.findAvailableChef();
-            if (s == null) {
-                System.out.println("Staff not found.");
+            Chef chef = staffService.findAvailableChef();
+
+            if (chef == null) {
+                System.out.println("No such chef.");
                 return;
             }
-            System.out.print("Station category (GRILL/DESSERT/BEVERAGE): ");
-            String cat = scanner.nextLine();
-            OrderCategory oc;
-            try {
-                oc = OrderCategory.valueOf(cat.toUpperCase());
-            } catch (Exception ex) {
-                System.out.println("Invalid category.");
-                return;
-            }
-            var stations = routerService.getStations();
-            var station = stations.get(oc);
+
+            System.out.print("Station category (GRILL/DESSERT/BEVERAGE/HOT_BEVERAGE/COLD_BEVERAGE): ");
+            OrderCategory cat = OrderCategory.valueOf(scanner.nextLine().toUpperCase());
+
+            var station = routerService.getStations().get(cat);
             if (station == null) {
-                System.out.println("Station not found.");
+                System.out.println("Invalid station.");
                 return;
             }
-            if (s instanceof Chef) {
-                station.assignChef((Chef) s);
-                System.out.println("Assigned.");
-            } else {
-                System.out.println("Staff is not a chef.");
-            }
+
+            station.assignChef(chef);
+            System.out.println("Chef assigned.");
+
         } catch (Exception e) {
-            System.out.println("Invalid input.");
+            System.out.println("Invalid.");
         }
     }
 
     private void manualRestock() {
         try {
-            System.out.print("Ingredient name: ");
+            System.out.print("Ingredient: ");
             String name = scanner.nextLine();
-            System.out.print("Quantity: ");
-            int q = Integer.parseInt(scanner.nextLine());
-            System.out.print("Expiry offset minutes: ");
+
+            System.out.print("Qty: ");
+            int qty = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Expiry (mins): ");
             long mins = Long.parseLong(scanner.nextLine());
-            long expiry = System.currentTimeMillis() + mins * 60_000L;
-            inventoryService.restock(name, q, expiry);
+
+            inventoryService.restock(name, qty, System.currentTimeMillis() + mins * 60000);
             System.out.println("Restocked.");
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -347,7 +335,7 @@ public class RestaurantView {
     private void showLowStock() {
         var low = inventoryService.getLowStockItems();
         if (low.isEmpty()) {
-            System.out.println("No low stock items.");
+            System.out.println("No low stock.");
             return;
         }
         low.forEach((k, v) -> System.out.println(k + " -> " + v));
@@ -357,70 +345,53 @@ public class RestaurantView {
         try {
             System.out.print("Table number: ");
             int t = Integer.parseInt(scanner.nextLine());
-            Bill b = billingService.getOrCreateBill(t);
-            System.out.println(b);
-            if (b.isPaid()) {
+
+            Bill bill = billingService.getOrCreateBill(t);
+            System.out.println(bill);
+
+            if (bill.isPaid()) {
                 System.out.println("Already paid.");
                 return;
             }
+
             System.out.println("1. Cash  2. Card  3. UPI");
             System.out.print("Method: ");
-            String m = scanner.nextLine();
-            PaymentMethod pm = switch (m) {
+
+            PaymentMethod method = switch (scanner.nextLine()) {
                 case "1" -> new CashPayment();
                 case "2" -> new CardPayment();
                 case "3" -> new UpiPayment();
                 default -> null;
             };
-            if (pm == null) {
+
+            if (method == null) {
                 System.out.println("Invalid.");
                 return;
             }
-            billingService.processPayment(t, pm);
+
+            billingService.processPayment(t, method);
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
     }
 
     private void viewAllOrders() {
-        List<Order> list = orderService.getAllOrders();
-        if (list.isEmpty()) {
-            System.out.println("No orders.");
-            return;
-        }
-        list.forEach(System.out::println);
+        orderService.getAllOrders().forEach(System.out::println);
     }
 
     private void viewActiveOrders() {
         orderService.getAllOrders().stream()
-                .filter(o -> o.getStatus() == OrderStatus.IN_PROGRESS || o.getStatus() == OrderStatus.ACCEPTED)
+                .filter(o -> o.getStatus() == OrderStatus.ACCEPTED ||
+                        o.getStatus() == OrderStatus.IN_PROGRESS)
                 .forEach(System.out::println);
     }
 
-    private void cancelOrder() {
-        try {
-            System.out.print("Order id: ");
-            int id = Integer.parseInt(scanner.nextLine());
-            boolean found = false;
-            for (Order o : orderService.getAllOrders()) {
-                if (o.getOrderId() == id) {
-                    o.setStatus(OrderStatus.REJECTED);
-                    logger.log("[MANAGER] Order#" + id + " cancelled");
-                    System.out.println("Cancelled.");
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) System.out.println("Order not found.");
-        } catch (Exception e) {
-            System.out.println("Invalid.");
-        }
-    }
 
     private void showReservations() {
-        Collection<Reservation> res = reservationService.getAllReservations();
+        var res = reservationService.getAllReservations();
         if (res.isEmpty()) {
-            System.out.println("No reservations.");
+            System.out.println("None.");
             return;
         }
         res.forEach(System.out::println);
@@ -429,18 +400,21 @@ public class RestaurantView {
     private void createReservation() {
         try {
             System.out.print("Table number: ");
-            int t = Integer.parseInt(scanner.nextLine());
-            System.out.print("Customer name: ");
-            String n = scanner.nextLine();
-            System.out.print("Start offset minutes: ");
+            int table = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Start offset mins: ");
             int so = Integer.parseInt(scanner.nextLine());
-            System.out.print("Duration minutes: ");
+
+            System.out.print("Duration mins: ");
             int du = Integer.parseInt(scanner.nextLine());
+
             var start = java.time.LocalDateTime.now().plusMinutes(so);
             var end = start.plusMinutes(du);
-            Reservation r = reservationService.reserveTable(t, start, end);
-            if (r == null) System.out.println("Unable to reserve.");
+
+            Reservation r = reservationService.reserveTable(table, start, end);
+            if (r == null) System.out.println("Failed.");
             else System.out.println("Reserved: " + r);
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -458,19 +432,14 @@ public class RestaurantView {
     }
 
     private void listTables() {
-        Collection<Table> list = tableService.listTables();
-        if (list.isEmpty()) {
-            System.out.println("No tables.");
-            return;
-        }
-        list.forEach(t -> System.out.println(t));
+        tableService.listTables().forEach(System.out::println);
     }
 
     private void addTable() {
         try {
             System.out.print("Table number: ");
-            int t = Integer.parseInt(scanner.nextLine());
-            if (tableService.addTable(t)) System.out.println("Added.");
+            int table = Integer.parseInt(scanner.nextLine());
+            if (tableService.addTable(table)) System.out.println("Added.");
             else System.out.println("Exists.");
         } catch (Exception e) {
             System.out.println("Invalid.");
@@ -479,10 +448,10 @@ public class RestaurantView {
 
     private void removeTable() {
         try {
-            System.out.print("Table number: ");
+            System.out.print("Table: ");
             int t = Integer.parseInt(scanner.nextLine());
             if (tableService.removeTable(t)) System.out.println("Removed.");
-            else System.out.println("Cannot remove.");
+            else System.out.println("Failed.");
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -490,7 +459,7 @@ public class RestaurantView {
 
     private void occupyTable() {
         try {
-            System.out.print("Table number: ");
+            System.out.print("Table: ");
             int t = Integer.parseInt(scanner.nextLine());
             if (tableService.occupyTable(t)) System.out.println("Occupied.");
             else System.out.println("Failed.");
@@ -501,7 +470,7 @@ public class RestaurantView {
 
     private void releaseTable() {
         try {
-            System.out.print("Table number: ");
+            System.out.print("Table: ");
             int t = Integer.parseInt(scanner.nextLine());
             if (tableService.releaseTable(t)) System.out.println("Released.");
             else System.out.println("Failed.");
@@ -512,7 +481,7 @@ public class RestaurantView {
 
     private void cleanTable() {
         try {
-            System.out.print("Table number: ");
+            System.out.print("Table: ");
             int t = Integer.parseInt(scanner.nextLine());
             if (tableService.cleanTable(t)) System.out.println("Cleaned.");
             else System.out.println("Failed.");
@@ -522,22 +491,22 @@ public class RestaurantView {
     }
 
     private void viewWaiters() {
-        List<Waiter> list = waiterService.getWaiters();
-        if (list.isEmpty()) {
-            System.out.println("No waiters.");
-            return;
-        }
-        list.forEach(System.out::println);
+        var list = waiterService.getWaiters();
+        if (list.isEmpty()) System.out.println("No waiters.");
+        else list.forEach(System.out::println);
     }
 
     private void addWaiter() {
         try {
             System.out.print("Waiter id: ");
             int id = Integer.parseInt(scanner.nextLine());
+
             System.out.print("Name: ");
             String name = scanner.nextLine();
+
             if (waiterService.addWaiter(id, name)) System.out.println("Added.");
             else System.out.println("Exists.");
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -549,6 +518,7 @@ public class RestaurantView {
             int id = Integer.parseInt(scanner.nextLine());
             if (waiterService.removeWaiter(id)) System.out.println("Removed.");
             else System.out.println("Not found.");
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -557,16 +527,23 @@ public class RestaurantView {
     private void assignWaiter() {
         try {
             System.out.print("Table number: ");
-            int t = Integer.parseInt(scanner.nextLine());
+            int table = Integer.parseInt(scanner.nextLine());
+
             System.out.print("Waiter id: ");
             int id = Integer.parseInt(scanner.nextLine());
-            Waiter w = waiterService.getWaiter(id);
-            if (w == null) {
+
+            Waiter waiter = waiterService.getWaiter(id);
+
+            if (waiter == null) {
                 System.out.println("Waiter not found.");
                 return;
             }
-            if (tableService.assignWaiterToTable(t, w)) System.out.println("Assigned.");
-            else System.out.println("Failed.");
+
+            if (tableService.assignWaiterToTable(table, waiter))
+                System.out.println("Assigned.");
+            else
+                System.out.println("Failed.");
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
@@ -576,30 +553,30 @@ public class RestaurantView {
         try {
             System.out.print("Table number: ");
             int t = Integer.parseInt(scanner.nextLine());
-            if (tableService.unassignWaiterFromTable(t)) System.out.println("Unassigned.");
-            else System.out.println("Failed.");
+
+            if (tableService.unassignWaiterFromTable(t))
+                System.out.println("Unassigned.");
+            else
+                System.out.println("Failed.");
+
         } catch (Exception e) {
             System.out.println("Invalid.");
         }
     }
 
     private void showLogs() {
-        System.out.println("\n=== LOGS ===");
-        List<String> logs = logger.getLogs();
-
+        var logs = logger.getLogs();
         if (logs.isEmpty()) {
-            System.out.println("(no logs recorded)");
+            System.out.println("(no logs)");
             return;
         }
-
         for (int i = logs.size() - 1; i >= 0; i--) {
             System.out.println(logs.get(i));
         }
     }
 
-
     private void showThreadStatus() {
-        System.out.println("\n=== THREAD STATUS ===");
+        System.out.println("\n=== THREADS ===");
         System.out.println("Engine started: " + engine.isStarted());
         System.out.println("Stations paused: " + engine.isStationsPaused());
     }

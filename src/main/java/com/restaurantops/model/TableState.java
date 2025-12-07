@@ -4,5 +4,6 @@ public enum TableState {
     FREE,
     RESERVED,
     OCCUPIED,
-    NEEDS_CLEANING
+    NEEDS_CLEANING,
+    MERGED
 }

@@ -43,18 +43,18 @@ public class CustomerView {
 
     public void run() {
         boolean running = true;
+
         while (running) {
-            System.out.println("\n=== Customer View ===");
+            System.out.println("\n=== CUSTOMER VIEW ===");
             System.out.println("1. Browse Menu");
             System.out.println("2. Place Order");
             System.out.println("3. Reserve Table");
             System.out.println("4. Occupy Reserved Table (by Reservation ID)");
             System.out.println("5. Occupy Any Free Table");
-            System.out.println("6. Exit Customer View");
+            System.out.println("6. Exit");
             System.out.print("Choice: ");
 
-            String input = scanner.nextLine();
-            switch (input) {
+            switch (scanner.nextLine()) {
                 case "1" -> browseMenu();
                 case "2" -> placeOrder();
                 case "3" -> reserveTable();
@@ -80,7 +80,8 @@ public class CustomerView {
             lastOrderedTable = table;
 
             browseMenu();
-            System.out.print("Enter menu item id: ");
+
+            System.out.print("Enter item id: ");
             int id = Integer.parseInt(scanner.nextLine());
 
             System.out.print("Enter quantity: ");
@@ -88,12 +89,13 @@ public class CustomerView {
 
             MenuItem item = menuService.getById(id);
             if (item == null) {
-                System.out.println("Invalid menu item id.");
+                System.out.println("Invalid item.");
                 return;
             }
 
             Order order = new Order(table, item, qty);
             orderService.placeOrder(order);
+
             System.out.println("Order placed: " + order);
 
         } catch (Exception e) {
@@ -103,47 +105,52 @@ public class CustomerView {
 
     private void reserveTable() {
         try {
-            System.out.print("Enter table number (1–10): ");
-            int table = Integer.parseInt(scanner.nextLine());
+            System.out.print("Table number: ");
+            int t = Integer.parseInt(scanner.nextLine());
 
-            System.out.print("Start time offset (minutes from now): ");
-            int startOffset = Integer.parseInt(scanner.nextLine());
+            System.out.print("Start offset minutes: ");
+            int offset = Integer.parseInt(scanner.nextLine());
 
-            System.out.print("Duration (minutes): ");
-            int duration = Integer.parseInt(scanner.nextLine());
+            System.out.print("Duration minutes: ");
+            int dur = Integer.parseInt(scanner.nextLine());
 
-            var start = LocalDateTime.now().plusMinutes(startOffset);
-            var end = start.plusMinutes(duration);
+            LocalDateTime start = LocalDateTime.now().plusMinutes(offset);
+            LocalDateTime end = start.plusMinutes(dur);
 
-            var r = reservationService.reserveTable(table, start, end);
+            var r = reservationService.reserveTable(t, start, end);
 
-            if (r == null) System.out.println("Table not available!");
-            else System.out.println("Reservation confirmed. ID: " + r.getReservationId());
+            if (r == null) {
+                System.out.println("Reservation failed.");
+            } else {
+                System.out.println("Reservation created! ID: " + r.getReservationId());
+            }
 
         } catch (Exception e) {
-            System.out.println("Invalid input.");
+            System.out.println("Invalid.");
         }
     }
 
     private void occupyReserved() {
         try {
-            System.out.print("Enter reservation ID: ");
+            System.out.print("Reservation ID: ");
             int id = Integer.parseInt(scanner.nextLine());
 
             boolean ok = tableService.occupyReservedTable(id);
-            if (ok) System.out.println("Your table is now occupied.");
-            else System.out.println("Invalid reservation ID or table cannot be occupied.");
+
+            if (ok) System.out.println("Table occupied.");
+            else System.out.println("Invalid reservation or table not available.");
+
         } catch (Exception e) {
-            System.out.println("Invalid input.");
+            System.out.println("Invalid.");
         }
     }
 
     private void occupyAnyFree() {
-        Integer table = tableService.occupyAnyFreeTable();
-        if (table == null) {
-            System.out.println("No free tables available.");
+        Integer t = tableService.occupyAnyFreeTable();
+        if (t == null) {
+            System.out.println("No free tables.");
         } else {
-            System.out.println("You have been seated at Table " + table);
+            System.out.println("You are seated at table " + t);
         }
     }
 
@@ -153,18 +160,15 @@ public class CustomerView {
 
         System.out.println();
 
-        if (order.getStatus() == OrderStatus.REJECTED) {
-            System.out.println("❌ Your order #" + order.getOrderId() + " was REJECTED.");
-            return;
-        }
-        if (order.getStatus() == OrderStatus.ACCEPTED) {
-            System.out.println("📦 Order #" + order.getOrderId() + " accepted by kitchen.");
-        }
-        if (order.getStatus() == OrderStatus.IN_PROGRESS) {
-            System.out.println("⏳ Order #" + order.getOrderId() + " is being prepared.");
-        }
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            System.out.println("✅ Order #" + order.getOrderId() + " is READY!");
+        switch (order.getStatus()) {
+            case ACCEPTED ->
+                    System.out.println("📦 Order #" + order.getOrderId() + " accepted.");
+            case IN_PROGRESS ->
+                    System.out.println("⏳ Order #" + order.getOrderId() + " being prepared.");
+            case COMPLETED ->
+                    System.out.println("✅ Order #" + order.getOrderId() + " ready!");
+            case REJECTED ->
+                    System.out.println("❌ Order #" + order.getOrderId() + " was rejected.");
         }
     }
 }
