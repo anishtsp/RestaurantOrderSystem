@@ -141,12 +141,18 @@ public class RestaurantEngine {
 
 
         routerService.getStations().forEach((cat, station) -> {
-            Chef chef = staffService.findAvailableChef();
-            if (chef != null) {
-                station.assignChef(chef);
-                logger.log("[ASSIGN] " + chef.getName() + " -> " + station.getName());
+            com.restaurantops.staff.Chef chef1 = staffService.findAvailableChef();
+            if (chef1 != null) {
+                station.assignChef(chef1);
+                logger.log("[ASSIGN] " + chef1.getName() + " -> " + station.getName());
+            }
+            com.restaurantops.staff.Chef chef2 = staffService.findAvailableChef();
+            if (chef2 != null) {
+                station.assignChef(chef2);
+                logger.log("[ASSIGN] " + chef2.getName() + " -> " + station.getName());
             }
         });
+
 
         dispatchThread = new DispatchThread(priorityQueue, routerService, logger);
         dispatchWorker = new Thread(dispatchThread, "Dispatch-Thread");

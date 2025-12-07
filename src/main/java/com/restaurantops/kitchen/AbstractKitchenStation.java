@@ -5,55 +5,62 @@ import com.restaurantops.model.Order;
 import com.restaurantops.model.OrderStatus;
 import com.restaurantops.billing.BillingService;
 import com.restaurantops.inventory.InventoryService;
-import com.restaurantops.util.LoggerService;
 import com.restaurantops.tracking.OrderTracker;
+import com.restaurantops.util.LoggerService;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 
-public abstract class AbstractKitchenStation implements KitchenStation, Runnable {
+public abstract class AbstractKitchenStation implements KitchenStation {
 
     protected final BlockingQueue<Order> queue = new LinkedBlockingQueue<>();
-
     protected final InventoryService inventoryService;
     protected final BillingService billingService;
     protected final OrderTracker orderTracker;
     protected final LoggerService logger;
-
-    private final AtomicBoolean running = new AtomicBoolean(false);
-    private Thread worker;
-
     private final StationContext context = new StationContext();
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private ExecutorService workers;
+    private final int workerCount;
 
     protected AbstractKitchenStation(InventoryService inventoryService,
                                      BillingService billingService,
                                      OrderTracker orderTracker,
-                                     LoggerService logger) {
+                                     LoggerService logger,
+                                     int workerCount) {
         this.inventoryService = inventoryService;
         this.billingService = billingService;
         this.orderTracker = orderTracker;
         this.logger = logger;
+        this.workerCount = Math.max(1, workerCount);
     }
 
-    @Override
     public void assignChef(Chef chef) {
         context.assignChef(chef);
-        logger.log("[CHEF] " + chef.getName() + " assigned to " + getName());
+        logger.log("[CHEF] " + (chef == null ? "null" : chef.getName()) + " assigned to " + getName() + " (now " + context.chefCount() + ")");
     }
 
-    @Override
+    public void unassignChef(Chef chef) {
+        context.unassignChef(chef);
+        logger.log("[CHEF] " + (chef == null ? "null" : chef.getName()) + " unassigned from " + getName() + " (now " + context.chefCount() + ")");
+    }
+
     public Chef getAssignedChef() {
         return context.getAssignedChef();
+    }
+
+    public List<com.restaurantops.staff.Chef> getAssignedChefs() {
+        return context.getAssignedChefs();
     }
 
     @Override
     public void acceptOrder(Order order) {
         try {
             queue.put(order);
-            Chef chef = getAssignedChef();
-            logger.log("[" + getName() + "][" + (chef == null ? "NoChef" : chef.getName()) +
-                    "] Accepted Order#" + order.getOrderId());
+            Chef c = getAssignedChef();
+            String chefName = c == null ? "NoChef" : c.getName();
+            logger.log("[" + getName() + "][" + chefName + "] Accepted Order#" + order.getOrderId());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -62,23 +69,54 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
     @Override
     public void start() {
         if (running.compareAndSet(false, true)) {
-            worker = new Thread(this, getName() + "-Worker");
-            worker.start();
-            logger.log("[" + getName() + "] Station started");
+            workers = Executors.newFixedThreadPool(workerCount, r -> {
+                Thread t = new Thread(r);
+                t.setName(getName() + "-Worker");
+                t.setDaemon(false);
+                return t;
+            });
+            for (int i = 0; i < workerCount; i++) {
+                workers.submit(this::workerLoop);
+            }
+            logger.log("[" + getName() + "] Station started with " + workerCount + " workers and " + context.chefCount() + " assigned chefs");
+        }
+    }
+
+    private void workerLoop() {
+        try {
+            while (running.get() && !Thread.currentThread().isInterrupted()) {
+                Order order = queue.take();
+                updateStatus(order, OrderStatus.ACCEPTED);
+                boolean reserved = inventoryService.reserveIngredients(order);
+                if (!reserved) {
+                    updateStatus(order, OrderStatus.REJECTED);
+                    logger.log("[" + getName() + "] Rejected Order#" + order.getOrderId());
+                    continue;
+                }
+                updateStatus(order, OrderStatus.IN_PROGRESS);
+                processOrder(order);
+                updateStatus(order, OrderStatus.COMPLETED);
+                billingService.addOrderToBill(order);
+                logger.log("[" + getName() + "] Completed Order#" + order.getOrderId());
+            }
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 
     @Override
     public void stop() {
         if (running.compareAndSet(true, false)) {
-            if (worker != null) worker.interrupt();
+            if (workers != null) {
+                workers.shutdownNow();
+                try {
+                    workers.awaitTermination(1, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             logger.log("[" + getName() + "] Station stopped");
         }
-    }
-
-    @Override
-    public boolean isRunning() {
-        return running.get();
     }
 
     @Override
@@ -87,44 +125,11 @@ public abstract class AbstractKitchenStation implements KitchenStation, Runnable
     }
 
     @Override
-    public void run() {
-        try {
-            while (running.get() && !Thread.currentThread().isInterrupted()) {
-
-                Order order = queue.take();
-
-                // === ACCEPTED ===
-                updateStatus(order, OrderStatus.ACCEPTED);
-
-                // === INGREDIENT CHECK ===
-                boolean ok = inventoryService.reserveIngredients(order);
-                if (!ok) {
-                    updateStatus(order, OrderStatus.REJECTED);
-                    logger.log("[" + getName() + "] Rejected Order#" + order.getOrderId());
-                    continue;
-                }
-
-                // === IN PROGRESS ===
-                updateStatus(order, OrderStatus.IN_PROGRESS);
-
-                // actual cooking simulation
-                processOrder(order);
-
-                // === COMPLETED ===
-                updateStatus(order, OrderStatus.COMPLETED);
-
-                billingService.addOrderToBill(order);
-
-                logger.log("[" + getName() + "] Completed Order#" + order.getOrderId());
-            }
-
-        } catch (InterruptedException ignored) {
-        } finally {
-            running.set(false);
-        }
+    public boolean isRunning() {
+        return running.get();
     }
 
-    private void updateStatus(Order order, OrderStatus status) {
+    protected void updateStatus(Order order, OrderStatus status) {
         order.setStatus(status);
         orderTracker.notifyUpdate(order);
     }

@@ -1,7 +1,6 @@
 package com.restaurantops.customer;
 
 import com.restaurantops.core.RestaurantEngine;
-import com.restaurantops.model.Customization;
 import com.restaurantops.model.MenuItem;
 import com.restaurantops.model.Order;
 import com.restaurantops.model.OrderStatus;
@@ -77,6 +76,7 @@ public class CustomerView {
         try {
             System.out.print("Enter table number: ");
             int table = Integer.parseInt(scanner.nextLine());
+
             lastOrderedTable = table;
 
             browseMenu();
@@ -92,21 +92,11 @@ public class CustomerView {
                 return;
             }
 
-            System.out.print("Extra cheese? (yes/no): ");
-            boolean cheese = scanner.nextLine().equalsIgnoreCase("yes");
-
-            System.out.print("Spice level (1-5): ");
-            int spice = Integer.parseInt(scanner.nextLine());
-
-            System.out.print("Toppings (comma separated): ");
-            String toppings = scanner.nextLine();
-
-            Customization c = new Customization(cheese, spice, toppings);
-            Order order = new Order(table, item, qty, c);
+            Order order = new Order(table, item, qty);
             orderService.placeOrder(order);
-            System.out.println("Your order has been placed: " + order);
+            System.out.println("Order placed: " + order);
 
-        } catch (NumberFormatException e) {
+        } catch (Exception e) {
             System.out.println("Invalid input.");
         }
     }
