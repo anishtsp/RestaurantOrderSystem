@@ -140,18 +140,25 @@ public class RestaurantEngine {
 
 
 
-        routerService.getStations().forEach((cat, station) -> {
-            com.restaurantops.staff.Chef chef1 = staffService.findAvailableChef();
-            if (chef1 != null) {
-                station.assignChef(chef1);
-                logger.log("[ASSIGN] " + chef1.getName() + " -> " + station.getName());
+        // Assign one chef per station in a round-robin manner (prevents duplicate-first-chef problem)
+        var chefList = staffService.getAllStaff().stream()
+                .filter(s -> s instanceof Chef)
+                .map(s -> (Chef) s)
+                .toList();
+
+        var stationList = routerService.getStations().values().stream().toList();
+
+        if (!chefList.isEmpty() && !stationList.isEmpty()) {
+            for (int i = 0; i < stationList.size(); i++) {
+                var st = stationList.get(i);
+                var chef = chefList.get(i % chefList.size());
+                st.assignChef(chef);
+                logger.log("[ASSIGN] " + chef.getName() + " -> " + st.getName());
             }
-            com.restaurantops.staff.Chef chef2 = staffService.findAvailableChef();
-            if (chef2 != null) {
-                station.assignChef(chef2);
-                logger.log("[ASSIGN] " + chef2.getName() + " -> " + station.getName());
-            }
-        });
+        } else {
+            logger.log("[ASSIGN] No chefs or no stations available for assignment.");
+        }
+
 
 
         dispatchThread = new DispatchThread(priorityQueue, routerService, logger);

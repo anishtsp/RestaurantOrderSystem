@@ -7,7 +7,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
+/**
+ * MenuService - now with basic CRUD and recipe access helpers.
+ */
 public class MenuService {
 
     private final List<MenuItem> items = new ArrayList<>();
@@ -112,23 +117,70 @@ public class MenuService {
         items.add(new MenuItem(12, "Gulab Jamun", 80, "Dessert",
                 recipeService.getRecipeForDish("gulab jamun"),
                 List.of("dairy"), 300));
-
     }
 
-    public List<MenuItem> getAllItems() {
-        return items;
+    // --------------------
+    // READ
+    // --------------------
+    public synchronized List<MenuItem> getAllItems() {
+        return new ArrayList<>(items);
     }
 
-    public MenuItem getById(int id) {
+    public synchronized MenuItem getById(int id) {
         for (MenuItem m : items) {
             if (m.getId() == id) return m;
         }
         return null;
     }
 
-    public void printMenu() {
+    public synchronized void printMenu() {
         for (MenuItem m : items) {
             System.out.println(m);
         }
+    }
+
+    // --------------------
+    // RECIPES helper (exposed for UI)
+    // --------------------
+    public Map<String, Recipe> getAllRecipes() {
+        return recipeService.getAllRecipes();
+    }
+
+    public Recipe getRecipeByName(String name) {
+        return recipeService.getRecipeForDish(name);
+    }
+
+    // --------------------
+    // CRUD
+    // --------------------
+    public synchronized int getNextId() {
+        int max = 0;
+        for (MenuItem m : items) {
+            if (m.getId() > max) max = m.getId();
+        }
+        return max + 1;
+    }
+
+    public synchronized boolean addMenuItem(MenuItem item) {
+        if (item == null) return false;
+        // ensure no duplicate id
+        if (getById(item.getId()) != null) return false;
+        items.add(item);
+        return true;
+    }
+
+    public synchronized boolean editMenuItem(MenuItem updated) {
+        if (updated == null) return false;
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).getId() == updated.getId()) {
+                items.set(i, updated);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized boolean removeMenuItem(int id) {
+        return items.removeIf(m -> m.getId() == id);
     }
 }

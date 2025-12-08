@@ -37,7 +37,14 @@ public class KitchenStaffPanel extends JPanel {
         add(buildStationsSection(), BorderLayout.NORTH);
         add(buildStaffSection(), BorderLayout.CENTER);
 
-        refreshTables();
+        // AUTO-REFRESH when tab becomes visible
+        addHierarchyListener(e -> {
+            if (isShowing()) {
+                SwingUtilities.invokeLater(this::refreshTables);
+            }
+        });
+
+        SwingUtilities.invokeLater(this::refreshTables);
     }
 
     /* ===========================
@@ -66,11 +73,13 @@ public class KitchenStaffPanel extends JPanel {
         startBtn.addActionListener(e -> {
             routerService.startAllStations();
             JOptionPane.showMessageDialog(this, "All stations started.");
+            SwingUtilities.invokeLater(this::refreshTables);
         });
 
         stopBtn.addActionListener(e -> {
             routerService.stopAllStations();
             JOptionPane.showMessageDialog(this, "All stations stopped.");
+            SwingUtilities.invokeLater(this::refreshTables);
         });
 
         assignBtn.addActionListener(e -> assignChefUI());
@@ -86,10 +95,10 @@ public class KitchenStaffPanel extends JPanel {
 
     private void assignChefUI() {
 
-        // Select category manually
+        // 1) Choose station category
         OrderCategory category = (OrderCategory) JOptionPane.showInputDialog(
                 this,
-                "Select station category to assign chef:",
+                "Select station category:",
                 "Assign Chef",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
@@ -99,23 +108,37 @@ public class KitchenStaffPanel extends JPanel {
 
         if (category == null) return;
 
-        Chef chef = staffService.findAvailableChef();
-        if (chef == null) {
-            JOptionPane.showMessageDialog(this, "No available chef found.");
+        // 2) Choose chef explicitly
+        var chefs = staffService.getAllStaff().stream()
+                .filter(s -> s instanceof Chef)
+                .map(s -> (Chef) s)
+                .toList();
+
+        if (chefs.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No chefs available.");
             return;
         }
 
-        // Retrieve target station (BEVERAGE will choose HOT beverage by default)
-        KitchenStation station = null;
+        Chef selectedChef = (Chef) JOptionPane.showInputDialog(
+                this,
+                "Select a chef:",
+                "Choose Chef",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                chefs.toArray(),
+                chefs.get(0)
+        );
 
-        Map<OrderCategory, KitchenStation> stations = routerService.getStations();
+        if (selectedChef == null) return;
+
+        // 3) Choose station
+        KitchenStation station;
 
         if (category == OrderCategory.BEVERAGE) {
-            // Ask hot or cold
             Object choice = JOptionPane.showInputDialog(
                     this,
                     "Select beverage station:",
-                    "Beverage Station",
+                    "Beverage Station Type",
                     JOptionPane.PLAIN_MESSAGE,
                     null,
                     new String[]{"Hot Beverage", "Cold Beverage"},
@@ -124,13 +147,12 @@ public class KitchenStaffPanel extends JPanel {
 
             if (choice == null) return;
 
-            if (choice.equals("Hot Beverage"))
-                station = routerService.getStations().get(OrderCategory.BEVERAGE); // original beverage station = hot
-            else
-                station = getColdBeverageStation(); // getter implemented below
+            station = choice.equals("Hot Beverage")
+                    ? getHotBeverageStation()
+                    : getColdBeverageStation();
 
         } else {
-            station = stations.get(category);
+            station = routerService.getStations().get(category);
         }
 
         if (station == null) {
@@ -138,17 +160,19 @@ public class KitchenStaffPanel extends JPanel {
             return;
         }
 
-        station.assignChef(chef);
+        // 4) Assign chef
+        station.assignChef(selectedChef);
 
-        JOptionPane.showMessageDialog(this,
-                "Chef " + chef.getName() + " assigned to " + station.getName());
+        JOptionPane.showMessageDialog(
+                this,
+                "Chef " + selectedChef.getName() + " assigned to " + station.getName()
+        );
 
-        refreshTables();
+        SwingUtilities.invokeLater(this::refreshTables);
     }
 
     /* Helper to reach cold beverage station */
     private KitchenStation getColdBeverageStation() {
-        // Cold beverage station is not inside stations map, so pull via reflection:
         try {
             var field = routerService.getClass().getDeclaredField("coldBeverage");
             field.setAccessible(true);
@@ -214,7 +238,7 @@ public class KitchenStaffPanel extends JPanel {
             staffIdField.setText("");
             staffNameField.setText("");
 
-            refreshTables();
+            SwingUtilities.invokeLater(this::refreshTables);
 
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Invalid input.");
@@ -227,40 +251,40 @@ public class KitchenStaffPanel extends JPanel {
 
     private void refreshTables() {
 
+        if (routerService == null) return;
+
+        // Stations
         DefaultTableModel stationModel = (DefaultTableModel) stationsTable.getModel();
         stationModel.setRowCount(0);
 
-        /* ---- Add GRILL / DESSERT / BEVERAGE (Hot) stations ---- */
         for (Map.Entry<OrderCategory, KitchenStation> entry : routerService.getStations().entrySet()) {
             KitchenStation st = entry.getValue();
             stationModel.addRow(new Object[]{
                     entry.getKey(),
                     st.getName(),
-                    st.getAssignedChef() == null ? "None" : st.getAssignedChef().getName()
+                    (st.getAssignedChef() == null ? "None" : st.getAssignedChef().getName())
             });
         }
 
-        /* ---- Add HOT beverage station ---- */
         KitchenStation hot = getHotBeverageStation();
         if (hot != null) {
             stationModel.addRow(new Object[]{
                     "BEVERAGE (Hot)",
                     hot.getName(),
-                    hot.getAssignedChef() == null ? "None" : hot.getAssignedChef().getName()
+                    (hot.getAssignedChef() == null ? "None" : hot.getAssignedChef().getName())
             });
         }
 
-        /* ---- Add COLD beverage station ---- */
         KitchenStation cold = getColdBeverageStation();
         if (cold != null) {
             stationModel.addRow(new Object[]{
                     "BEVERAGE (Cold)",
                     cold.getName(),
-                    cold.getAssignedChef() == null ? "None" : cold.getAssignedChef().getName()
+                    (cold.getAssignedChef() == null ? "None" : cold.getAssignedChef().getName())
             });
         }
 
-        /* ---- Refresh Staff table ---- */
+        // Staff
         DefaultTableModel staffModel = (DefaultTableModel) staffTable.getModel();
         staffModel.setRowCount(0);
 
